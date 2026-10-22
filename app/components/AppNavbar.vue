@@ -22,21 +22,21 @@ const active = ref('Hotel')
             </div>
 
             <div class="ml-auto flex gap-3 md:ml-4">
-                <button
-                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-30">
+                <NuxtLink to="/login"
+                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-[120px] text-center">
                     Sign In
-                </button>
-                <button
-                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-30">
+                </NuxtLink>
+                <NuxtLink to="/register"
+                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-[120px] text-center">
                     Register
-                </button>
+                </NuxtLink>
             </div>
         </div>
 
         <!-- Tabs -->
         <nav class="page-container flex gap-3 overflow-x-auto pb-7 md:justify-center">
             <button v-for="tab in tabs" :key="tab"
-                class="w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-19.5 xl:w-22.5"
+                class="w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]"
                 :class="active === tab ? 'border-primary-500 bg-primary-500 text-white' : 'border-gray-300 bg-white text-gray-400 hover:border-primary-400'"
                 @click="active = tab">
                 {{ tab }}
