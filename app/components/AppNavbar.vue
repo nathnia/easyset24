@@ -1,12 +1,32 @@
 <script setup lang="ts">
 const logo = '/images/logo.svg'
-const tabs = ['Trip', '%Deals', 'Hotel', 'Flight', 'Apartment', 'Camper']
-const active = ref('Hotel')
+
+const tabs = [
+    { label: 'Trip', to: '/' },
+    { label: '%Deals' },
+    { label: 'Hotel', to: '/hotels' },
+    { label: 'Flight', to: '/flights' },
+    { label: 'Apartment' },
+    { label: 'Camper' },
+]
+
+const route = useRoute()
+const active = computed(() => {
+    if (route.path === '/') return 'Trip'
+    if (route.path.startsWith('/flights') || route.path === '/hotel-reservation') return 'Flight'
+    if (route.path.startsWith('/hotels')) return 'Hotel'
+    if (route.path.startsWith('/flights') || route.path === '/hotel-reservation' || route.path === '/flight-ticket') return 'Flight'
+    return ''
+})
+
+const tabBase = 'w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]'
+const tabActive = 'border-primary-500 bg-primary-500 text-white'
+const authBtn =
+    'w-24 rounded-sm border border-primary-400 bg-white py-2 text-center text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-[120px]'
 </script>
 
 <template>
     <header class="bg-background">
-        <!-- Top row: logo, help, flag, search, auth buttons -->
         <div class="page-container flex items-center gap-3 py-5 md:gap-4">
             <NuxtLink to="/" class="shrink-0">
                 <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
@@ -22,25 +42,23 @@ const active = ref('Hotel')
             </div>
 
             <div class="ml-auto flex gap-3 md:ml-4">
-                <NuxtLink to="/login"
-                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-[120px] text-center">
-                    Sign In
-                </NuxtLink>
-                <NuxtLink to="/register"
-                    class="w-24 rounded-sm border border-primary-400 bg-white py-2 text-button-xl text-primary-500 hover:bg-primary-500 hover:text-white md:w-[120px] text-center">
-                    Register
-                </NuxtLink>
+                <NuxtLink to="/login" :class="authBtn">Sign In</NuxtLink>
+                <NuxtLink to="/register" :class="authBtn">Register</NuxtLink>
             </div>
         </div>
 
         <!-- Tabs -->
         <nav class="page-container flex gap-3 overflow-x-auto pb-7 md:justify-center">
-            <button v-for="tab in tabs" :key="tab"
-                class="w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]"
-                :class="active === tab ? 'border-primary-500 bg-primary-500 text-white' : 'border-gray-300 bg-white text-gray-400 hover:border-primary-400'"
-                @click="active = tab">
-                {{ tab }}
-            </button>
+            <template v-for="tab in tabs" :key="tab.label">
+                <NuxtLink v-if="tab.to" :to="tab.to"
+                    :class="[tabBase, active === tab.label ? tabActive : 'border-gray-300 bg-white text-gray-400 hover:border-primary-400']">
+                    {{ tab.label }}
+                </NuxtLink>
+                <span v-else
+                    :class="[tabBase, active === tab.label ? tabActive : 'cursor-not-allowed border-gray-300 bg-white text-gray-400 opacity-60']">
+                    {{ tab.label }}
+                </span>
+            </template>
         </nav>
     </header>
 </template>
