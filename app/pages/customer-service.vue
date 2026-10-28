@@ -25,19 +25,20 @@ const helpCenter = [
     { title: 'All the important things in one place', text: 'Call Or Message The Property, And See All The Essential Information About Your Stay.' },
 ]
 
-const answer = 'Since This Option Is A Non-Refundable Reservation And There Is No Cancellation Opportunity, Payment Is Usually Processed At The Time Of Booking Or Shortly Thereafter.'
+const placeholder = "If you have a free cancellation booking, you won't pay a cancellation fee. If your booking is no longer free to cancel or is non-refundable, you may incur a cancellation fee. Any cancellation fees are determined by the property. You will pay any additional costs to the property."
 
 const faqs = [
-    { q: 'How And When Do I Pay?', a: answer },
-    { q: 'Is There Anti-Allergic Meal?', a: answer },
-    { q: 'Does The Hotel Have A Pool?', a: answer },
-    { q: 'Any Identification Documents Is Necessary', a: answer },
-    { q: 'What Are The Check-In And Check-Out Times?', a: answer },
-    { q: 'Why Was I Charged?', a: answer },
-    { q: 'Is There A Spa?', a: answer },
+    { q: 'Can I Cancel My Booking?', a: placeholder },
+    { q: 'If I Need To Cancel My Booking, Will I Pay A Fee?', a: placeholder },
+    { q: "Who's Going To Charge My Credit Card And When?", a: placeholder },
+    { q: 'Can I Make Changes To My Booking (I.E. Change Dates)?', a: placeholder },
+    { q: "I Can't Find My Confirmation Email. What Should I Do?", a: placeholder },
+    { q: 'Can I Make A Reservation Without A Credit Card?', a: placeholder },
+    { q: 'Why Was I Charged?', a: placeholder },
+    { q: 'How Do I Find Out If Properties Allow Pets?', a: placeholder },
 ]
 
-const openItems = ref<number[]>(faqs.map((_, i) => i))
+const openItems = ref<number[]>([4])
 const isOpen = (i: number) => openItems.value.includes(i)
 const toggle = (i: number) => {
     openItems.value = isOpen(i)
@@ -88,16 +89,22 @@ const toggle = (i: number) => {
                     <div v-for="(f, i) in faqs" :key="f.q" class="border-b border-gray-200">
                         <button type="button" :id="`faq-btn-${i}`" :aria-expanded="isOpen(i)"
                             :aria-controls="`faq-panel-${i}`"
-                            class="group flex w-full items-center justify-between gap-4 px-6 pb-3 pt-6 text-left"
+                            class="flex w-full items-center justify-between gap-4 px-6 py-6 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
                             @click="toggle(i)">
-                            <span class="text-label-m transition-colors group-hover:text-gray-500">{{ f.q }}</span>
+                            <span class="text-label-m transition-colors" :class="isOpen(i) ? 'text-gray-500' : ''">{{
+                                f.q }}</span>
                             <Icon name="icon-park-outline:down" size="18"
-                                class="shrink-0 text-gray-400 transition-transform duration-200"
+                                class="shrink-0 text-gray-400 transition-transform duration-300 motion-reduce:transition-none"
                                 :class="isOpen(i) ? 'rotate-180' : ''" />
                         </button>
-                        <div v-show="isOpen(i)" :id="`faq-panel-${i}`" role="region" :aria-labelledby="`faq-btn-${i}`"
-                            class="px-6 pb-6">
-                            <p class="text-body-xs">{{ f.a }}</p>
+                        <div :id="`faq-panel-${i}`" role="region" :aria-labelledby="`faq-btn-${i}`"
+                            :inert="isOpen(i) ? undefined : true"
+                            class="grid transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none"
+                            :class="isOpen(i) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'">
+                            <div class="overflow-hidden transition-opacity duration-300 motion-reduce:transition-none"
+                                :class="isOpen(i) ? 'opacity-100' : 'opacity-0'">
+                                <p class="px-10 pb-6 text-body-xs">{{ f.a }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
