@@ -1,11 +1,40 @@
 <script setup lang="ts">
-const columns = [
-    { title: 'About Us', links: ['Our Story', 'Work With Us', 'Press & Media', 'Privacy & Security'] },
-    { title: 'We Offer', links: ['Trip Sponsorship', 'Last Minutes Flights', 'Best Deals', 'AI-Driven Search'] },
-    { title: 'Headquarters', links: ['England', 'France', 'Canada', 'Iceland'] },
-    { title: 'Travel Blogs', links: ['Bali Travel Guide', 'Sri Travel Guide', 'Peru Travel Guide', 'Swiss Travel Guide'] },
-    { title: 'Activities', links: ['Tour Leading', 'Cruising & Sailing', 'Camping', 'Kayaking'] },
-    { title: 'Service', links: ['Report Error', 'Ask Online', 'Travel Insurance'] },
+type FooterLink = { label: string, to: string }
+type FooterColumn = { title: string, to?: string, links: FooterLink[] }
+
+const link = (label: string, to = '#'): FooterLink => ({ label, to })
+
+const columns: FooterColumn[] = [
+    {
+        title: 'About Us',
+        to: '/about',
+        links: [link('Our Story', '/about'), link('Work With Us'), link('Press & Media'), link('Privacy & Security')],
+    },
+    {
+        title: 'We Offer',
+        links: [link('Trip Sponsorship'), link('Last Minutes Flights'), link('Best Deals'), link('AI-Driven Search')],
+    },
+    {
+        title: 'Headquarters',
+        links: [link('England'), link('France'), link('Canada'), link('Iceland')],
+    },
+    {
+        title: 'Travel Blogs',
+        links: [link('Bali Travel Guide'), link('Sri Travel Guide'), link('Peru Travel Guide'), link('Swiss Travel Guide')],
+    },
+    {
+        title: 'Activities',
+        links: [link('Tour Leading'), link('Cruising & Sailing'), link('Camping'), link('Kayaking')],
+    },
+    {
+        title: 'Service',
+        to: '/customer-service',
+        links: [
+            link('Report Error', '/customer-service'),
+            link('Ask Online', '/customer-service'),
+            link('Travel Insurance', '/customer-service'),
+        ],
+    },
 ]
 const payments = ['logos:visa', 'logos:amex', 'logos:mastercard', 'logos:paypal']
 const socials = ['linkedin', 'telegram', 'twitter', 'facebook', 'instagram']
@@ -14,7 +43,6 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
 
 <template>
     <footer class="bg-background">
-        <!-- App promo -->
         <div class="border-b border-gray-200">
             <div class="page-container flex flex-col justify-between gap-6 py-10 md:flex-row">
                 <div>
@@ -27,7 +55,6 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
                 </div>
 
                 <div class="flex flex-col gap-4">
-                    <!-- App Store -->
                     <div class="flex items-center gap-4">
                         <a href="#"
                             class="flex h-10 w-30 items-center justify-center gap-2 rounded-md bg-black text-white">
@@ -39,7 +66,6 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
                         </a>
                         <img :src="qr" alt="App Store QR" class="h-10 w-10" />
                     </div>
-                    <!-- Google Play -->
                     <div class="flex items-center gap-4">
                         <a href="#"
                             class="flex h-10 w-30 items-center justify-center gap-2 rounded-md border border-gray-300 bg-white">
@@ -56,19 +82,21 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
         </div>
 
         <div class="page-container py-10">
-            <!-- Link columns -->
             <div class="grid grid-cols-2 gap-8 md:flex md:justify-between">
                 <div v-for="col in columns" :key="col.title">
-                    <h3 class="text-label-m">{{ col.title }}</h3>
+                    <NuxtLink v-if="col.to" :to="col.to" class="text-label-m hover:text-primary-500">
+                        {{ col.title }}
+                    </NuxtLink>
+                    <h3 v-else class="text-label-m">{{ col.title }}</h3>
                     <ul class="mt-4 space-y-4">
-                        <li v-for="l in col.links" :key="l">
-                            <NuxtLink to="#" class="text-body-s text-gray-500 hover:text-primary-500">{{ l }}</NuxtLink>
+                        <li v-for="l in col.links" :key="l.label">
+                            <NuxtLink :to="l.to" class="text-body-s text-gray-500 hover:text-primary-500">{{ l.label }}
+                            </NuxtLink>
                         </li>
                     </ul>
                 </div>
             </div>
 
-            <!-- Payments, socials, newsletter -->
             <div class="mt-12 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
                 <div class="flex gap-3">
                     <div v-for="p in payments" :key="p"
@@ -99,7 +127,6 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
             </div>
         </div>
 
-        <!-- Bottom bar -->
         <div class="bg-gray-300">
             <div
                 class="page-container flex flex-col gap-3 py-4 text-body-xs md:flex-row md:items-center md:justify-between">
