@@ -1,6 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
+const { signIn } = useAuth()
+
 const firstName = ref('')
 const lastName = ref('')
 const email = ref('')
@@ -12,12 +14,17 @@ const confirmError = ref('')
 watch(confirmPassword, () => (confirmError.value = ''))
 
 function onSubmit() {
-    // Demo only: replace with a real API call later
     if (password.value !== confirmPassword.value) {
         confirmError.value = 'The Passwords Do Not Match'
         return
     }
     if (!agree.value) return
+    signIn({
+        name: `${firstName.value} ${lastName.value}`.trim() || 'Anna Carinna',
+        email: email.value || 'anna.carinna@gmail.com',
+        avatar: 'https://i.pravatar.cc/100?img=47',
+    })
+    navigateTo('/')
 }
 
 const inputClass =
@@ -29,7 +36,6 @@ const inputClass =
         <form @submit.prevent="onSubmit">
             <h1 class="text-h6">Register</h1>
 
-            <!-- First + last name side by side -->
             <div class="mt-4 grid grid-cols-2 gap-3">
                 <div>
                     <label for="first-name" class="text-body-xs">First Name</label>

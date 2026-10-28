@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const logo = '/images/logo.svg'
+const { isLoggedIn } = useAuth()
 
 const tabs = [
     { label: 'Trip', to: '/' },
@@ -26,13 +27,16 @@ const authBtn =
 </script>
 
 <template>
-    <header class="bg-background">
+    <header class="sticky top-0 z-40 bg-background">
         <div class="page-container flex items-center gap-3 py-5 md:gap-4">
             <NuxtLink to="/" class="shrink-0">
                 <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
             </NuxtLink>
-            <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
-            <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
+
+            <template v-if="!isLoggedIn">
+                <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
+                <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
+            </template>
 
             <div class="relative hidden flex-1 md:block">
                 <input type="text" placeholder="Search"
@@ -41,13 +45,22 @@ const authBtn =
                     class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
             </div>
 
-            <div class="ml-auto flex gap-3 md:ml-4">
+            <div v-if="!isLoggedIn" class="ml-auto flex gap-3 md:ml-4">
                 <NuxtLink to="/login" :class="authBtn">Sign In</NuxtLink>
                 <NuxtLink to="/register" :class="authBtn">Register</NuxtLink>
             </div>
+
+            <div v-else class="ml-auto flex items-center gap-2.5 md:ml-4 md:gap-3">
+                <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
+                <Icon name="icon-park-outline:dollar" size="18" class="shrink-0 text-primary-500"
+                    aria-label="Currency" />
+                <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
+                <Icon name="icon-park-outline:like" size="18" class="shrink-0 text-primary-500" />
+                <Icon name="icon-park-outline:phone-call" size="18" class="shrink-0 text-primary-500" />
+                <AccountMenu />
+            </div>
         </div>
 
-        <!-- Tabs -->
         <nav class="page-container flex gap-3 overflow-x-auto pb-7 md:justify-center">
             <template v-for="tab in tabs" :key="tab.label">
                 <NuxtLink v-if="tab.to" :to="tab.to"

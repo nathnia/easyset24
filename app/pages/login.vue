@@ -1,17 +1,24 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'auth' })
 
+const { signIn } = useAuth()
+const route = useRoute()
+
 const email = ref('')
 const password = ref('')
 const remember = ref(false)
 const error = ref('')
 
-// typing again clears the error
 watch(password, () => (error.value = ''))
 
 function onSubmit() {
-    // Demo only: replace with a real API call later
-    error.value = password.value.length < 8 ? 'The Password Is Incorrect' : ''
+    if (password.value.length < 8) {
+        error.value = 'The Password Is Incorrect'
+        return
+    }
+    signIn({ name: 'Anna Carinna', email: email.value || 'anna.carinna@gmail.com', avatar: 'https://i.pravatar.cc/100?img=47' })
+    const target = String(route.query.redirect || '/')
+    navigateTo(target.startsWith('/') && !target.startsWith('//') ? target : '/')
 }
 </script>
 

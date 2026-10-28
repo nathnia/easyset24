@@ -10,17 +10,10 @@ const logo = '/images/logo.svg'
                     <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
                 </NuxtLink>
 
-                <div class="flex items-center gap-3 md:gap-4">
-                    <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
-                    <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
-                    <NuxtLink to="/account" class="flex items-center gap-2">
-                        <img src="https://i.pravatar.cc/100?img=47" alt=""
-                            class="h-10 w-10 shrink-0 rounded-full object-cover" />
-                        <span class="hidden leading-tight sm:block">
-                            <span class="block text-label-m text-primary-500">Your Account</span>
-                            <span class="block text-caption-s text-primary-500">Anna Carinna</span>
-                        </span>
-                    </NuxtLink>
+                <div class="flex items-center gap-2.5 md:gap-3">
+                    <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
+                    <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
+                    <AccountMenu />
                 </div>
             </div>
         </header>
