@@ -41,6 +41,14 @@
   --color-success-light: #e8f5e4;
   --color-success-dark: #4c9839;
 
+  /* VIP ribbon gradient */
+  --color-vip-light: #3fb0ea;
+  --color-vip-dark: #0b6fa8;
+
+  /* Airline brand */
+  --color-airline-turkish: #e81932;
+  --color-airline-british: #075aaa;
+
   /* Corner radius */
   --radius-sm: 4px;
   --radius-md: 8px;

@@ -1,4 +1,3 @@
-<!-- Password input with show/hide eye and error state. Use: <PasswordField v-model="password" id="password" label="Password" /> -->
 <script setup lang="ts">
 defineProps<{
     id: string

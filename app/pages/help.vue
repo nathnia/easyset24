@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Help - EasySet24' })
+useHead({ title: 'Help' })
 
 const showChat = ref(false)
 

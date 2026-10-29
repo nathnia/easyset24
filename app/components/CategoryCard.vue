@@ -20,11 +20,7 @@ withDefaults(
             <img :src="image" :alt="name"
                 class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
 
-            <button type="button"
-                class="absolute left-2 top-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-black/70 text-white transition hover:scale-110 hover:bg-primary-500"
-                aria-label="Save">
-                <Icon name="icon-park-outline:like" size="22" />
-            </button>
+            <FavButton class="absolute left-2 top-2" />
 
             <div class="absolute inset-x-0 bottom-0 flex h-12 items-center justify-between bg-black/50 px-3">
                 <span class="text-h5 text-white/80">{{ count }}</span>

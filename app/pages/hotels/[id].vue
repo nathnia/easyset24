@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: 'Hotel Information - EasySet24' })
+useHead({ title: 'Hotel Information' })
 
 const images = [1, 2, 3, 4, 5].map((n) => `https://picsum.photos/seed/easyset-hotel-${n}/800/600`)
 
@@ -125,7 +125,7 @@ const rates = [
                                     <Icon name="icon-park-outline:like" size="18"
                                         :class="liked ? 'text-error-light' : 'text-black'" />
                                 </button>
-                                <NuxtLink to="/hotel-payment"
+                                <NuxtLink to="/hotels/payment"
                                     class="flex h-10 flex-1 items-center justify-center rounded-sm bg-primary-500 px-8 text-button-l text-white hover:bg-primary-600 md:w-56 md:flex-none">
                                     Book Now
                                 </NuxtLink>

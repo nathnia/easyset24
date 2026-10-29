@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Settings - EasySet24' })
+useHead({ title: 'Settings' })
 
 const security = [
     { label: 'Email', to: '/setting-email' },

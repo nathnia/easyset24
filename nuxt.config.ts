@@ -15,7 +15,8 @@ export default defineNuxtConfig({
   app: {
     head: {
       htmlAttrs: { lang: "en" },
-      title: "Nuxt Slicing",
+      title: "EasySet 24",
+      titleTemplate: "%s - EasySet24",
       meta: [
         { name: "viewport", content: "width=device-width, initial-scale=1" },
       ],

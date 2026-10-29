@@ -1,17 +1,15 @@
 const protectedPaths = [
   "/profile",
-  "/hotel-reservation",
-  "/hotel-payment",
-  "/hotel-favourites",
-  "/flight-favourites",
-  "/flight-payment",
-  "/flight-ticket",
+  "/hotels/reservation",
+  "/hotels/payment",
+  "/hotels/favourites",
+  "/flights/payment",
+  "/flights/ticket",
+  "/flights/favourites",
   "/setting",
   "/payment",
   "/preferences",
-  "/profile-basic-information",
-  "/profile-mandatory-information",
-  "/tracking-reservation",
+  "/tracking-registration",
 ];
 const guestOnlyPaths = ["/login", "/register"];
 

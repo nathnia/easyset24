@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: 'Payment Details - EasySet24' })
+useHead({ title: 'Payment Details' })
 
 const photo = (n: number) => `https://picsum.photos/seed/easyset-pay-${n}/200/160`
 
@@ -44,64 +44,34 @@ const tagRows = [roomTags.slice(0, 3), roomTags.slice(3)]
 
 type Key = 'first' | 'middle' | 'last' | 'email' | 'phone' | 'country' | 'cardName' | 'cardNumber' | 'exp' | 'cvc'
 
-const form = reactive<Record<Key, string>>({
-    first: '', middle: '', last: '', email: '', phone: '', country: '',
-    cardName: '', cardNumber: '', exp: '', cvc: '',
-})
-const errors = reactive<Partial<Record<Key, string>>>({})
+const { form, errors, validateField, validateAll, onInput, formatCard, formatExp, formatCvc, scrollToFirstError } =
+    usePaymentForm<Key>({
+        initial: {
+            first: '', middle: '', last: '', email: '', phone: '', country: '',
+            cardName: '', cardNumber: '', exp: '', cvc: '',
+        },
+        rules: {
+            first: required('First name is required'),
+            last: required('Last name is required'),
+            email: validEmail,
+            phone: validPhone,
+            country: required('Country is required'),
+            cardName: required('Name on the card is required'),
+            cardNumber: validCard,
+            exp: validExp,
+            cvc: validCvc,
+        },
+        cardKey: 'cardNumber',
+    })
 
-const rules: Partial<Record<Key, (v: string) => string>> = {
-    first: v => (v.trim() ? '' : 'First name is required'),
-    last: v => (v.trim() ? '' : 'Last name is required'),
-    email: v => (!v.trim() ? 'Email is required' : /^\S+@\S+\.\S+$/.test(v) ? '' : 'Enter a valid email'),
-    phone: v => (/^\d{7,15}$/.test(v.replace(/[\s-]/g, '')) ? '' : 'Enter a valid phone number'),
-    country: v => (v ? '' : 'Country is required'),
-    cardName: v => (v.trim() ? '' : 'Name on the card is required'),
-    cardNumber: v => (/^\d{13,19}$/.test(v.replace(/\s/g, '')) ? '' : 'Enter a valid card number'),
-    exp: (v) => {
-        const m = v.match(/^(\d{2})\/(\d{2})$/)
-        if (!m) return 'MM/YY'
-        const month = Number(m[1])
-        const year = 2000 + Number(m[2])
-        const now = new Date()
-        if (month < 1 || month > 12) return 'Invalid month'
-        const expired = year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)
-        return expired ? 'Card expired' : ''
-    },
-    cvc: v => (/^\d{3,4}$/.test(v) ? '' : '3-4 digits'),
-}
-
-function validateField(key: Key) {
-    errors[key] = rules[key]?.(form[key]) ?? ''
-    return !errors[key]
-}
-function onInput(key: Key) {
-    if (errors[key]) validateField(key)
-}
 const fieldCls = (key: Key) => [field, errors[key] ? 'border-error-light!' : '']
 
-function formatCard() {
-    form.cardNumber = form.cardNumber.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim()
-    onInput('cardNumber')
-}
-function formatExp() {
-    const d = form.exp.replace(/\D/g, '').slice(0, 4)
-    form.exp = d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d
-    onInput('exp')
-}
-function formatCvc() {
-    form.cvc = form.cvc.replace(/\D/g, '').slice(0, 4)
-    onInput('cvc')
-}
-
 async function submit() {
-    const results = (Object.keys(rules) as Key[]).map(validateField)
-    if (results.every(Boolean)) {
-        await navigateTo('/hotel-reservation')
+    if (validateAll()) {
+        await navigateTo('/hotels/reservation')
         return
     }
-    await nextTick()
-    document.querySelector('[data-error]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    await scrollToFirstError()
 }
 </script>
 

@@ -1,4 +1,3 @@
-<!-- Layout for login / register pages: simple header, no tabs, no footer -->
 <script setup lang="ts">
 const logo = '/images/logo.svg'
 </script>

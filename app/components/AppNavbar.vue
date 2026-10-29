@@ -12,11 +12,18 @@ const tabs = [
 ]
 
 const route = useRoute()
+
+const scrolled = ref(false)
+const onScroll = () => { scrolled.value = window.scrollY > 4 }
+onMounted(() => {
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+})
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 const active = computed(() => {
     if (route.path === '/') return 'Trip'
-    if (route.path.startsWith('/flights') || route.path === '/hotel-reservation') return 'Flight'
     if (route.path.startsWith('/hotels')) return 'Hotel'
-    if (route.path.startsWith('/flights') || route.path === '/hotel-reservation' || route.path === '/flight-ticket') return 'Flight'
+    if (route.path.startsWith('/flights')) return 'Flight'
     return ''
 })
 
@@ -27,37 +34,40 @@ const authBtn =
 </script>
 
 <template>
-    <header class="sticky top-0 z-40 bg-background">
-        <div class="page-container flex items-center gap-3 py-5 md:gap-4">
-            <NuxtLink to="/" class="shrink-0">
-                <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
-            </NuxtLink>
+    <header class="contents">
+        <div class="sticky top-0 z-40 bg-background transition-shadow duration-200"
+            :class="scrolled ? 'shadow-md' : ''">
+            <div class="page-container flex items-center gap-3 py-5 md:gap-4">
+                <NuxtLink to="/" class="shrink-0">
+                    <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
+                </NuxtLink>
 
-            <template v-if="!isLoggedIn">
-                <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
-                <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
-            </template>
+                <template v-if="!isLoggedIn">
+                    <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
+                    <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
+                </template>
 
-            <div class="relative hidden flex-1 md:block">
-                <input type="text" placeholder="Search"
-                    class="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-caption-s outline-none placeholder:text-gray-400 focus:border-primary-400" />
-                <Icon name="icon-park-outline:search" size="16"
-                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            </div>
+                <div class="relative hidden flex-1 md:block">
+                    <input type="text" placeholder="Search"
+                        class="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-caption-s outline-none placeholder:text-gray-400 focus:border-primary-400" />
+                    <Icon name="icon-park-outline:search" size="16"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
 
-            <div v-if="!isLoggedIn" class="ml-auto flex gap-3 md:ml-4">
-                <NuxtLink to="/login" :class="authBtn">Sign In</NuxtLink>
-                <NuxtLink to="/register" :class="authBtn">Register</NuxtLink>
-            </div>
+                <div v-if="!isLoggedIn" class="ml-auto flex gap-3 md:ml-4">
+                    <NuxtLink to="/login" :class="authBtn">Sign In</NuxtLink>
+                    <NuxtLink to="/register" :class="authBtn">Register</NuxtLink>
+                </div>
 
-            <div v-else class="ml-auto flex items-center gap-2.5 md:ml-4 md:gap-3">
-                <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
-                <Icon name="icon-park-outline:dollar" size="18" class="shrink-0 text-primary-500"
-                    aria-label="Currency" />
-                <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
-                <Icon name="icon-park-outline:like" size="18" class="shrink-0 text-primary-500" />
-                <Icon name="icon-park-outline:phone-call" size="18" class="shrink-0 text-primary-500" />
-                <AccountMenu />
+                <div v-else class="ml-auto flex items-center gap-2.5 md:ml-4 md:gap-3">
+                    <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
+                    <Icon name="icon-park-outline:dollar" size="18" class="shrink-0 text-primary-500"
+                        aria-label="Currency" />
+                    <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
+                    <Icon name="icon-park-outline:like" size="18" class="shrink-0 text-primary-500" />
+                    <Icon name="icon-park-outline:phone-call" size="18" class="shrink-0 text-primary-500" />
+                    <AccountMenu />
+                </div>
             </div>
         </div>
 

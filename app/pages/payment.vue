@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Payment - EasySet24' })
+useHead({ title: 'Payment' })
 
 const form = reactive({
     name: '',

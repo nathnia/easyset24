@@ -65,7 +65,7 @@ const packageImages = ['asia-1', 'asia-2', 'asia-3', 'asia-4'].map(s => img(s, 7
                     :class="p.pos">
                     <div class="pointer-events-none absolute -left-1 -top-1 z-10 h-16 w-16 overflow-hidden">
                         <span
-                            class="absolute -left-6 top-3.5 w-24 -rotate-45 bg-linear-to-b from-[#3fb0ea] to-[#0b6fa8] py-px text-center text-[7px] text-white shadow"
+                            class="absolute -left-6 top-3.5 w-24 -rotate-45 bg-linear-to-b from-vip-light to-vip-dark py-px text-center text-[7px] text-white shadow"
                             style="clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%)">
                             Special Offer
                         </span>

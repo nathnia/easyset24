@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: 'Digital Ticket - EasySet24' })
+useHead({ title: 'Digital Ticket' })
 
 const columns = 'grid-cols-[240fr_300fr_260fr_125fr]'
 
@@ -11,7 +11,7 @@ const segments = [
         to: { time: '15:45 PM', date: 'Thursday , April 6', city: 'Rome (Italy)', airport: 'Rome Fiumicino Airport (FCO)' },
     },
     {
-        airline: 'British Airways', icon: 'simple-icons:britishairways', iconClass: 'text-[#075aaa]', ring: false,
+        airline: 'British Airways', icon: 'simple-icons:britishairways', iconClass: 'text-airline-british', ring: false,
         code: 'Tk 29', cabin: 'Economy Class', duration: '2 Hours', connecting: true,
         from: { time: '21:45 PM', date: 'Thursday , April 6', city: 'Rome (Italy)', airport: 'Rome Fiumicino Airport (FCO)' },
         to: { time: '23:45 PM', date: 'Thursday , April 6', city: 'Istanbul (Turkiye)', airport: 'Sabha (SAW)' },

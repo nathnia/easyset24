@@ -1,21 +1,7 @@
 <script setup lang="ts">
-useHead({ title: 'Flight Search Result - EasySet24' })
+import { filterGroups, airlines, info } from '~/data/flights'
 
-const PHOTO_IDS: Record<string, string> = {
-    'Turkish Airlines': 'photo-1436491865332-7a61a109cc05',
-    'Delta Airlines': 'photo-1464037866556-6812c9d1c72e',
-    'Lufthansa': 'photo-1569629743817-70d8db6c323b',
-    'British Airways': 'photo-1530521954074-e64f6810b32d',
-}
-const flightImage = (airline: string, w = 500, h = 700) =>
-    `https://images.unsplash.com/${PHOTO_IDS[airline] ?? PHOTO_IDS['Turkish Airlines']}?auto=format&fit=crop&w=${w}&h=${h}&q=80`
-
-const onFlightImgError = (e: Event, airline: string, w = 500, h = 700) => {
-    const el = e.target as HTMLImageElement
-    const lock = [...airline].reduce((a, c) => a + c.charCodeAt(0), 0)
-    const fallback = `https://loremflickr.com/${w}/${h}/airplane,aircraft?lock=${lock}`
-    if (el.src !== fallback) el.src = fallback
-}
+useHead({ title: 'Flight Search Result' })
 
 const dep = reactive({ min: 12 * 60, max: 16 * 60 + 45 })
 const dur = reactive({ min: 7, max: 12 })
@@ -50,11 +36,6 @@ const fill = (m: { min: number; max: number }, max: number) => ({
     width: `${((m.max - m.min) / max) * 100}%`,
 })
 
-const filterGroups = [
-    { key: 'airline', title: 'Airline', type: 'check', more: 'SWITZERLAND', options: ['Austrian Airlines', 'Air France', 'Lufthansa', 'Brussels Airlines', 'ITA Airways'] },
-    { key: 'rating', title: 'Passenger Rating', type: 'radio', more: 'Show More', options: ['All', 'Outstanding 9+', 'Very Good 8+', 'Good 7+', 'Excellent', 'Poor'] },
-    { key: 'popular', title: 'Popular Filters', type: 'check', more: 'Show More', options: ['Drink Included', 'Taxes Included', 'VIP', 'Child Friendly', 'Pet Friendly'] },
-]
 const selected = reactive<Record<string, any>>({
     airline: ['Lufthansa'],
     rating: 'Very Good 8+',
@@ -63,26 +44,6 @@ const selected = reactive<Record<string, any>>({
 const aiFilter = ref(false)
 const randomFilter = ref(true)
 
-const airlines = [
-    { name: 'Turkish Airlines', logo: 'bg-[#e81932] text-white', icon: 'simple-icons:turkishairlines', iconSize: 42 },
-    { name: 'Delta Airlines', logo: 'bg-white', icon: '', iconSize: 0 },
-    { name: 'Lufthansa', logo: 'bg-white text-black', icon: 'simple-icons:lufthansa', iconSize: 56 },
-]
-const info = {
-    from: 'Stockholm',
-    to: 'Istanbul',
-    duration: '9h ,45m',
-    departure: '12:00',
-    stops: ['18:00', '20:00'],
-    stopText: 'One Stop, 3h Between',
-    landing: '10:00',
-    fromAirport: 'ARN Stockholm',
-    viaAirport: 'FCO Rome Fiumicino',
-    toAirport: 'SAW Istanbul Sabiha',
-    price: '$75',
-    seats: '25 Vacant Seats',
-    carbon: '31% less carbon dioxide',
-}
 </script>
 
 <template>
@@ -243,7 +204,7 @@ const info = {
                 </div>
 
                 <div class="mt-12 flex flex-col justify-between gap-4 sm:flex-row">
-                    <NuxtLink to="/flight-favourites"
+                    <NuxtLink to="/flights/favourites"
                         class="flex items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white px-8 py-3 text-button-xxl text-primary-500 hover:bg-primary-500 hover:text-white">
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />

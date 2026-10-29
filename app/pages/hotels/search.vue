@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const u = (id: string, w = 600) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`
+import { hotels, filterGroups } from '~/data/hotels'
 
 const mapZoom = 11
 const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
@@ -7,24 +7,7 @@ const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
     src: `https://tile.openstreetmap.org/${mapZoom}/${x}/${y}.png`,
 })))
 
-const hotels = [
-    { id: 1, name: 'Radisson Blu', image: u('1610641818989-c2051b5e2cfd'), location: 'Located In Downton, 500m Distance to Shore', tagline: 'Experience Unique Opportunity', room: 'Standard rooms', ratingLabel: 'Very Good', reviews: '2,259 Reviews', rating: '8,2', discount: '12% Off', price: '$125', left: 'We Have 8 Left at 12% off' },
-    { id: 2, name: 'Radisson Blu', image: u('1629140727571-9b5c6f6267b4'), location: 'Located In Downton,700m Distance to See', tagline: 'Traditional Room Design', room: 'Historical Café And Bar', ratingLabel: 'Excellent', reviews: '2,230 Reviews', rating: '8,2', discount: '10% Off', price: '$130', left: 'We Have 5 Left at 10 % off', vip: true },
-    { id: 3, name: 'Radisson Blu', image: u('1520250497591-112f2f40a3f4'), location: 'Located In Downton, 500m Distance to Shore', tagline: 'Experience Unique Opportunity', room: 'Classic Room Design With Cultural Foods', ratingLabel: 'Very Good', reviews: '2,100 Reviews', rating: '8,2', discount: '8% Off', price: '$145', left: 'We Have 2 Left at 8 % off' },
-    { id: 4, name: 'Radisson Blu', image: u('1540541338287-41700207dee6'), location: 'Located In Downton, 500m Distance to Shore', tagline: 'Suny Moments With Family Facilities', room: 'See View Balconies', ratingLabel: 'Good', reviews: '1258 Reviews', rating: '7,3', discount: '4% Off', price: '$150', left: 'We Have 21 Left at 4% off', vip: true },
-    { id: 5, name: 'Radisson Blu', image: u('1584132967334-10e028bd69f7'), location: 'Located In Downton, 500m Distance to Shore', tagline: 'Modern Soundings', room: 'Special Leisure Activities', ratingLabel: 'Very Good', reviews: '2,259 Reviews', rating: '8,2', discount: '30% Off', price: '$218', left: 'We Have 6 Left at 30 % off' },
-]
 
-const filterGroups = [
-    { key: 'popular', title: 'Popular Filters', type: 'check', options: ['Breakfast Included', 'All-Inclusive', 'Free Cancellation', 'Pool', 'Pet Friendly'] },
-    { key: 'room', title: 'Room Facilities', type: 'check', options: ['Own Bathroom', 'Kitchen', 'See View', 'Baby Bed', 'Bathtub'] },
-    { key: 'rating', title: 'Guests Rating', type: 'radio', options: ['All', 'Outstanding 9+', 'Very Good 8+', 'Good 7+', 'Excellent', 'Poor'] },
-    { key: 'bed', title: 'Bed Type', type: 'radio', options: ['Two Single Beds', 'King Beds', 'Baby Cots', 'Double Bed', 'Single Beds'] },
-    { key: 'leisure', title: 'Leisure Activities', type: 'check', options: ['Sauna', 'Fitness Centre', 'Bar', 'Steam Bath', 'Yoga'] },
-    { key: 'sustain', title: 'Travel Sustainability', type: 'radio', options: ['Level 2 And Above 1', 'Level And Above 2'] },
-    { key: 'stars', title: 'Accommodation Classification', type: 'radio', options: ['5 Stars', '4 Stars', '3 Stars'] },
-    { key: 'distance', title: 'Distance From The Centre', type: 'radio', options: ['Less Than 1 Km', 'Less Than 5 Km', 'Less Than 15 Km'] },
-]
 
 const selected = reactive<Record<string, any>>({
     popular: ['Free Cancellation'],
@@ -164,7 +147,7 @@ const fillStyle = computed(() => ({
                 </div>
 
                 <div class="mt-8 flex flex-col justify-between gap-4 sm:flex-row">
-                    <NuxtLink to="/hotel-favourites"
+                    <NuxtLink to="/hotels/favourites"
                         class="flex items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white px-8 py-3 text-button-xxl text-primary-500 hover:bg-primary-500 hover:text-white">
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />

@@ -3,7 +3,7 @@ import type { NuxtError } from '#app'
 
 defineProps<{ error: NuxtError }>()
 
-useHead({ title: '404 - EasySet24' })
+useHead({ title: '404' })
 
 const goHome = () => clearError({ redirect: '/' })
 </script>

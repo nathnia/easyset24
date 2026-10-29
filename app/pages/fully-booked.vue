@@ -22,7 +22,7 @@ function notify() {
                         </h2>
                         <p class="mt-2 text-label-m">We Apologize For The Inconvenience .</p>
                     </div>
-                    <NuxtLink to="/hotel-favourites" aria-label="Close" class="shrink-0 hover:text-gray-500">
+                    <NuxtLink to="/hotels/favourites" aria-label="Close" class="shrink-0 hover:text-gray-500">
                         <Icon name="icon-park-outline:close" size="24" />
                     </NuxtLink>
                 </div>

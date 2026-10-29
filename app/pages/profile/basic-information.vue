@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Basic Information - EasySet24' })
+useHead({ title: 'Basic Information' })
 
 const form = reactive({
     firstName: '',
@@ -104,7 +104,7 @@ const accessibilityOptions = ['Not Provided', 'Wheelchair access', 'Visual assis
                             <select v-model="form.accessibility"
                                 class="h-12 w-full appearance-none bg-transparent px-2 pt-4 text-body-s outline-none">
                                 <option v-for="option in accessibilityOptions" :key="option" :value="option">{{ option
-                                    }}</option>
+                                }}</option>
                             </select>
                             <Icon name="icon-park-outline:down" size="14"
                                 class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-500" />

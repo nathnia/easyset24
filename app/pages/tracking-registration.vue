@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Input PIN - EasySet24' })
+useHead({ title: 'Input PIN' })
 
 const IMAGE_SRC = 'https://unsplash.com/photos/iCQ9vAECrxM/download?force=true&w=1000'
 

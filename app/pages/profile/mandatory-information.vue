@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Provide Mandatory Information - EasySet24' })
+useHead({ title: 'Provide Mandatory Information' })
 
 const form = reactive({
     firstName: 'Anna',

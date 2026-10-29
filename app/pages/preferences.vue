@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Preferences - EasySet24' })
+useHead({ title: 'Preferences' })
 
 const currency = ref('U.S Dollar')
 const currencies = ['U.S Dollar', 'Euro', 'British Pound']

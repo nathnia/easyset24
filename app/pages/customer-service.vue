@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: 'Customer Service - EasySet24' })
+useHead({ title: 'Customer Service' })
 
 const contacts = [
     {

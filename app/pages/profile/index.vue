@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'checkout' })
-useHead({ title: 'Profile - EasySet24' })
+useHead({ title: 'Profile' })
 
 const basicInfo = [
     { label: 'Full Name', value: 'Anna Carolina' },
@@ -32,7 +32,7 @@ const contact = [
                             Make Sure This Information Matches Your Travel ID, Like Your Passport Or License.
                         </p>
                     </div>
-                    <NuxtLink to="/profile-basic-information"
+                    <NuxtLink to="/profile/basic-information"
                         class="text-body-xs text-primary-500 transition-colors hover:text-primary-600">
                         Edit
                     </NuxtLink>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'default' })
-useHead({ title: 'About Us - EasySet24' })
+useHead({ title: 'About Us' })
 
 const founders = [
     {

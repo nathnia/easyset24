@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const u = (id: string, w = 600) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`
+import { unsplash as u } from '~/data/hotels'
 
 const base = { name: 'Radisson Blu', location: 'La Kalsa, Palermo', rating: '8,2', left: 'We Have 8 Left At 12% Off' }
 const hotels = [

@@ -7,7 +7,7 @@ const direction = computed<Direction>(() => route.query.direction === 'return' ?
 const isReturn = computed(() => direction.value === 'return')
 
 useHead({
-    title: computed(() => isReturn.value ? 'Flight Detail (Return) - EasySet24' : 'Flight Detail - EasySet24'),
+    title: computed(() => isReturn.value ? 'Flight Detail (Return)' : 'Flight Detail'),
 })
 
 const mapZoom = 5
@@ -121,7 +121,7 @@ const tabs: { label: string, value: Direction }[] = [
                                 <path d="M12 3 22 20H2z" fill="#e01933" />
                                 <path d="M12 10.5 16.5 18h-9z" fill="#fff" />
                             </svg>
-                            <Icon v-else :name="f.icon" size="24" class="text-[#e81932]" />
+                            <Icon v-else :name="f.icon" size="24" class="text-airline-turkish" />
                             {{ f.airline }}
                         </p>
                     </div>
@@ -233,7 +233,7 @@ const tabs: { label: string, value: Direction }[] = [
                         <Icon :name="a.icon" size="28" />{{ a.label }}
                     </button>
                 </div>
-                <NuxtLink :to="{ path: '/flight-payment', query: { flight: route.params.id, direction } }"
+                <NuxtLink :to="{ path: '/flights/payment', query: { flight: route.params.id, direction } }"
                     class="flex h-14 w-full items-center justify-center rounded-sm bg-primary-500 text-button-xl text-white hover:bg-primary-600 sm:w-75">
                     Purchase The Flight
                 </NuxtLink>

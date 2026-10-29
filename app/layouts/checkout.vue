@@ -1,10 +1,19 @@
 <script setup lang="ts">
 const logo = '/images/logo.svg'
+
+const scrolled = ref(false)
+const onScroll = () => { scrolled.value = window.scrollY > 4 }
+onMounted(() => {
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+})
+onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
 </script>
 
 <template>
     <div class="flex min-h-screen flex-col bg-background">
-        <header class="border-b border-gray-200 bg-background">
+        <header class="sticky top-0 z-40 border-b border-gray-200 bg-background transition-shadow duration-200"
+            :class="scrolled ? 'shadow-md' : ''">
             <div class="page-container flex items-center justify-between gap-3 py-5 md:gap-4">
                 <NuxtLink to="/" class="shrink-0">
                     <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />

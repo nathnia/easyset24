@@ -100,7 +100,7 @@ const promos = [
                     :class="p.pos">
                     <div class="pointer-events-none absolute -left-2 -top-2 z-20 h-24 w-24 overflow-hidden">
                         <span
-                            class="absolute -left-9.5 top-5 w-35 -rotate-45 bg-linear-to-b from-[#3fb0ea] to-[#0b6fa8] py-0.75 text-center text-[11px] font-medium text-white shadow-md"
+                            class="absolute -left-9.5 top-5 w-35 -rotate-45 bg-linear-to-b from-vip-light to-vip-dark py-0.75 text-center text-[11px] font-medium text-white shadow-md"
                             style="clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%)">
                             Best Deals
                         </span>

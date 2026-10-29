@@ -25,7 +25,7 @@ withDefaults(defineProps<{
         :class="compact ? 'sm:min-h-0 sm:gap-4 sm:p-2' : 'sm:min-h-75'">
         <div v-if="hotel.vip" class="pointer-events-none absolute -right-2 -top-2 z-20 h-32 w-32 overflow-hidden">
             <span
-                class="absolute -right-9.5 top-6.5 w-42.5 rotate-45 bg-linear-to-b from-[#3fb0ea] to-[#0b6fa8] py-1 text-center text-label-m text-white shadow-[0_3px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.35)]"
+                class="absolute -right-9.5 top-6.5 w-42.5 rotate-45 bg-linear-to-b from-vip-light to-vip-dark py-1 text-center text-label-m text-white shadow-[0_3px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.35)]"
                 style="clip-path: polygon(8% 0, 92% 0, 100% 100%, 0 100%)">
                 VIP Gifts
             </span>
@@ -35,11 +35,7 @@ withDefaults(defineProps<{
             :class="compact ? 'sm:h-58 sm:min-h-0 sm:w-44' : 'sm:min-h-69 sm:w-57.5'">
             <img :src="hotel.image" :alt="hotel.name"
                 class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            <button type="button"
-                class="absolute left-3 top-3 z-10 flex items-center justify-center rounded-full bg-black/70 text-white hover:bg-primary-500"
-                :class="compact ? 'h-7 w-7' : 'h-10 w-10'" aria-label="Save">
-                <Icon name="icon-park-outline:like" :size="compact ? 16 : 22" />
-            </button>
+            <FavButton class="absolute left-3 top-3 z-10" :size="compact ? 'sm' : 'lg'" />
             <div class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-3"
                 :class="compact ? 'h-9' : 'h-11'">
                 <div class="flex gap-0.5 text-white/80">

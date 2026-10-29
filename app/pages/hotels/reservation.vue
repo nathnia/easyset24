@@ -1,5 +1,5 @@
 <script setup lang="ts">
-useHead({ title: 'Hotel Reservation Confirmed - EasySet24' })
+useHead({ title: 'Hotel Reservation Confirmed' })
 
 const bookingNo = 1385
 
