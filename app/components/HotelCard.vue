@@ -9,9 +9,9 @@ withDefaults(defineProps<{
         ratingLabel?: string
         reviews?: string
         rating: string
-        discount: string
+        discount?: string
         price: string
-        left: string
+        left?: string
         vip?: boolean
     }
     compact?: boolean
@@ -88,8 +88,9 @@ withDefaults(defineProps<{
             <!-- Price -->
             <div class="flex flex-col justify-end gap-1" :class="compact ? 'md:w-auto' : 'md:w-67.5 md:text-right'">
                 <p class="flex items-baseline" :class="compact ? 'gap-2' : 'gap-6 md:justify-end'">
-                    <span class="text-error-light" :class="compact ? 'order-2 text-body-xxs' : 'text-body-s'">{{
-                        hotel.discount }}</span>
+                    <span v-if="hotel.discount" class="text-error-light"
+                        :class="compact ? 'order-2 text-body-xxs' : 'text-body-s'">{{
+                            hotel.discount }}</span>
                     <span class="text-success-dark" :class="compact ? 'text-h6 font-bold text-black!' : 'text-h3'">{{
                         hotel.price }}</span>
                 </p>
@@ -98,7 +99,7 @@ withDefaults(defineProps<{
                     :class="compact ? '' : 'md:justify-end'">
                     <Icon name="icon-park-outline:leaf" size="16" />Trip Sustainable Level, 5
                 </p>
-                <p class="flex items-center gap-1.5 text-body-xs text-error-light"
+                <p v-if="hotel.left" class="flex items-center gap-1.5 text-body-xs text-error-light"
                     :class="compact ? '' : 'md:justify-end'">
                     <Icon name="icon-park-outline:attention" size="16" />{{ hotel.left }}
                 </p>

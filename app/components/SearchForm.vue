@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLocationsStore } from '~/stores/locations'
+
 const props = withDefaults(defineProps<{
     type?: 'hotel' | 'flight'
     place?: string
@@ -11,7 +13,7 @@ const configs = {
         subtitle: 'Find Exclusive Genius Rewards In Every Corner Of The World!',
         labels: ['Place', 'VIP', 'Passengers - Room Condition', 'Check In -Check Out'],
         icon: 'icon-park-outline:building-one',
-        first: 'Gutenberg',
+        first: 'Jakarta',
         secondOptions: ['Long Lasting', 'Loyalty Gifts'],
         second: 'Long Lasting',
         thirdOptions: ['One Room', 'Two Rooms', 'Three Rooms'],
@@ -36,11 +38,25 @@ const configs = {
 const c = configs[props.type]
 
 const first = ref(props.place ?? c.first)
+
+// Hotel form: city suggestions from LiteAPI (country fixed to Indonesia)
+const locations = useLocationsStore()
+const { cities } = storeToRefs(locations)
+if (props.type === 'hotel') {
+    useAsyncData('cities', async () => {
+        await locations.fetchCities('ID')
+        return true
+    })
+}
 const second = ref(props.vip ?? c.second)
 const third = ref(c.third)
 
 function search() {
-    if (c.to) navigateTo(c.to)
+    if (props.type === 'hotel') {
+        navigateTo({ path: c.to, query: { cityName: first.value.trim() } })
+    } else if (c.to) {
+        navigateTo(c.to)
+    }
 }
 
 const field = 'flex h-[50px] items-center gap-3 border border-gray-300 bg-white px-3 text-body-s md:-ml-px md:first:ml-0'
@@ -57,7 +73,11 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                 <label class="mb-1 block text-label-m">{{ c.labels[0] }}</label>
                 <div :class="field">
                     <Icon :name="c.icon" size="22" class="shrink-0 text-gray-500" />
-                    <input v-model="first" type="text" class="w-full outline-none" />
+                    <input v-model="first" type="text" :list="type === 'hotel' ? 'city-options' : undefined"
+                        class="w-full outline-none" />
+                    <datalist v-if="type === 'hotel'" id="city-options">
+                        <option v-for="ci in cities" :key="ci" :value="ci" />
+                    </datalist>
                 </div>
             </div>
 

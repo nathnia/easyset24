@@ -5,9 +5,15 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
 
-  modules: ["@nuxt/icon"],
+  modules: ["@nuxt/icon", "@pinia/nuxt"],
 
   css: ["~/assets/css/main.css"],
+
+  // Private (server only). Set NUXT_LITEAPI_KEY in .env
+  runtimeConfig: {
+    liteapiKey: "",
+  },
+
   vite: {
     plugins: [tailwindcss()],
   },

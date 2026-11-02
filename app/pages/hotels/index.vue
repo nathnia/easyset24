@@ -55,7 +55,7 @@ const promos = [
 
 <template>
     <div>
-        <SearchForm place="Gutenberg" vip="Long Lasting" />
+        <SearchForm place="Jakarta" vip="Long Lasting" />
 
         <!--  HERO + TABS  -->
         <section class="relative mt-8 h-115 bg-gray-400 md:h-160">

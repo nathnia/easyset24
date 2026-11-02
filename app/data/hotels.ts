@@ -1,4 +1,4 @@
-// Mock data for hotel pages. Replace with API calls later.
+// Sample hotel data. Used by pages/hotels/search.vue and favourites.vue as a fallback when LiteAPI is unavailable.
 
 export const unsplash = (id: string, w = 600) =>
   `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;

@@ -1,5 +1,20 @@
 <script setup lang="ts">
-import { hotels, filterGroups } from '~/data/hotels'
+import { filterGroups } from '~/data/hotels'
+import { useHotelsStore } from '~/stores/hotels'
+
+const route = useRoute()
+const city = computed(() => String(route.query.cityName || 'Jakarta'))
+// /data/hotels needs a country; default is Indonesia. Override with ?countryCode=XX
+const country = computed(() => String(route.query.countryCode || 'ID'))
+
+const store = useHotelsStore()
+const { cards: hotels, loading, loadingMore, error, hasMore } = storeToRefs(store)
+
+// Runs on the server too, so the first page is already rendered on load
+await useAsyncData('hotels', async () => {
+    await store.fetchHotels(city.value, country.value)
+    return true
+}, { watch: [city, country] })
 
 const mapZoom = 11
 const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
@@ -54,7 +69,7 @@ const fillStyle = computed(() => ({
 
 <template>
     <div>
-        <SearchForm place="Gothenburg" vip="Loyalty Gifts" />
+        <SearchForm :place="city" vip="Loyalty Gifts" />
 
         <section class="page-container mt-10 flex flex-col gap-6 md:flex-row md:items-stretch">
             <div
@@ -76,8 +91,8 @@ const fillStyle = computed(() => ({
                     <span class="text-body-xs"><b class="text-label-m">Sort By</b> : Our Top Picks For Families</span>
                     <Icon name="icon-park-outline:sort-two" size="18" />
                 </button>
-                <h2 class="mt-5 text-h4 text-gray-500">Gothenburg</h2>
-                <p class="mt-1 text-body-xxs">120 Properties Found</p>
+                <h2 class="mt-5 text-h4 text-gray-500">{{ city }}</h2>
+                <p class="mt-1 text-body-xxs">{{ hotels.length }}{{ hasMore ? '+' : '' }} Properties Found</p>
                 <p class="mt-4 max-w-xl text-body-s text-gray-500">
                     Travel Professionals Dedicated To Simplifying Your Travel Experience By Curating Flight And
                     Accommodation
@@ -142,7 +157,12 @@ const fillStyle = computed(() => ({
             </aside>
 
             <div>
-                <div class="space-y-6">
+                <p v-if="loading" class="text-body-s text-gray-500">Loading hotels...</p>
+                <p v-else-if="error" class="text-body-s text-error-light">{{ error }}</p>
+                <p v-else-if="!hotels.length" class="text-body-s text-gray-500">
+                    No hotels found for "{{ city }}" ({{ country }}).
+                </p>
+                <div v-else class="space-y-6">
                     <HotelCard v-for="h in hotels" :key="h.id" :hotel="h" :to="`/hotels/${h.id}`" />
                 </div>
 
@@ -152,9 +172,9 @@ const fillStyle = computed(() => ({
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />
                     </NuxtLink>
-                    <button type="button"
-                        class="flex items-center justify-center gap-2 rounded-sm bg-primary-500 px-8 py-3 text-button-xxl text-white hover:bg-primary-600">
-                        See More Search Results
+                    <button v-if="hasMore" type="button" :disabled="loadingMore" @click="store.loadMore(city, country)"
+                        class="flex items-center justify-center gap-2 rounded-sm bg-primary-500 px-8 py-3 text-button-xxl text-white hover:bg-primary-600 disabled:opacity-60">
+                        {{ loadingMore ? 'Loading...' : 'See More Search Results' }}
                         <Icon name="icon-park-outline:right" size="16" />
                     </button>
                 </div>
