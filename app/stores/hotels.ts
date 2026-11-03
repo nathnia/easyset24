@@ -4,8 +4,10 @@ import {
   toHotelDetail,
   toReviewCard,
   toRates,
+  toFacility,
 } from "~/utils/liteapi";
 import type {
+  Facility,
   LiteApiHotel,
   LiteApiHotelsResponse,
   LiteApiHotelDetailResponse,
@@ -21,6 +23,8 @@ export const useHotelsStore = defineStore("hotels", {
     loadingMore: false,
     error: "",
     hasMore: false,
+    facilities: [] as Facility[],
+    facilityIds: [] as number[],
     detail: null as ReturnType<typeof toHotelDetail> | null,
     detailLoading: false,
     detailError: "",
@@ -29,17 +33,30 @@ export const useHotelsStore = defineStore("hotels", {
   }),
 
   getters: {
-    // Shape expected by <HotelCard>
     cards: (state) => state.items.map(toHotelCard),
   },
 
   actions: {
+    facilityQuery() {
+      return this.facilityIds.length
+        ? {
+            facilityIds: this.facilityIds.join(","),
+            strictFacilitiesFiltering: "true",
+          }
+        : {};
+    },
+
     async fetchHotels(city: string, country: string) {
       this.loading = true;
       this.error = "";
       try {
         const res = await $fetch<LiteApiHotelsResponse>("/api/hotels", {
-          query: { cityName: city, countryCode: country, limit: LIMIT },
+          query: {
+            cityName: city,
+            countryCode: country,
+            limit: LIMIT,
+            ...this.facilityQuery(),
+          },
         });
         this.items = res.data;
         this.hasMore = res.data.length === LIMIT;
@@ -52,6 +69,20 @@ export const useHotelsStore = defineStore("hotels", {
           "Failed to load hotels.";
       } finally {
         this.loading = false;
+      }
+    },
+
+    async fetchFacilities() {
+      if (this.facilities.length) return;
+      try {
+        const res: any = await $fetch("/api/facilities");
+        const list: unknown[] = Array.isArray(res) ? res : (res?.data ?? []);
+        this.facilities = list
+          .map(toFacility)
+          .filter((f): f is Facility => !!f)
+          .sort((a, b) => a.name.localeCompare(b.name));
+      } catch {
+        this.facilities = [];
       }
     },
 
@@ -82,7 +113,8 @@ export const useHotelsStore = defineStore("hotels", {
         this.reviews = res.data.map(toReviewCard).filter((r) => r.text);
         this.rates = toRates(res.sentimentAnalysis);
       } catch {
-        // reviews are optional: the page still works without them
+        this.reviews = [];
+        this.rates = [];
       }
     },
 
@@ -95,6 +127,7 @@ export const useHotelsStore = defineStore("hotels", {
             countryCode: country,
             limit: LIMIT,
             offset: this.items.length,
+            ...this.facilityQuery(),
           },
         });
         this.items = [...this.items, ...res.data];

@@ -19,17 +19,21 @@ const liked = ref(false)
 
 const faqs = [
     { question: 'How And When Do I Pay?', answer: 'Since this option is a non-refundable reservation and there is no cancellation opportunity, payment is usually processed at the time of booking or shortly thereafter.' },
-    { question: 'Is There Anti-Allergic Meal?', answer: '' },
-    { question: 'Does The Hotel Have A Pool?', answer: '' },
-    { question: 'Any Identification Documents Is Necessary', answer: '' },
-    { question: 'What Are The Check-In And Check-Out Times?', answer: '' },
-    { question: 'Why Was I Charged?', answer: '' },
-    { question: 'Is There A Spa?', answer: '' },
+    { question: 'Is There Anti-Allergic Meal?', answer: 'Special meals, such as allergen-free options, can be requested from the hotel before arrival. Contact the property after booking to confirm your needs.' },
+    { question: 'Does The Hotel Have A Pool?', answer: 'Facilities differ for each property. See the Amenities list in Place Details to check if a pool is available.' },
+    { question: 'Any Identification Documents Is Necessary', answer: 'A valid photo ID or passport is normally required at check-in. International guests are usually asked for a passport.' },
+    { question: 'What Are The Check-In And Check-Out Times?', answer: 'Times differ for each property and are confirmed in your booking details. Check-in is usually in the afternoon and check-out is usually before noon.' },
+    { question: 'Why Was I Charged?', answer: 'The charge is the room rate plus any taxes and fees shown at checkout. Your booking confirmation has the full breakdown.' },
+    { question: 'Is There A Spa?', answer: 'Facilities differ for each property. See the Amenities list in Place Details to check if a spa is available.' },
 ]
-const openFaq = ref<number | null>(0)
+const openFaq = ref<number[]>([0])
+const toggleFaq = (i: number) => {
+    openFaq.value = openFaq.value.includes(i)
+        ? openFaq.value.filter((n) => n !== i)
+        : [...openFaq.value, i]
+}
 
 const track = ref<HTMLElement | null>(null)
-// one arrow click = one full page of cards (gap-4 = 16px)
 const scroll = (dir: 1 | -1) =>
     track.value?.scrollBy({ left: dir * (track.value.clientWidth + 16), behavior: 'smooth' })
 </script>
@@ -56,7 +60,6 @@ const scroll = (dir: 1 | -1) =>
                 </button>
             </div>
 
-            <!-- Details -->
             <div>
                 <div class="flex flex-wrap">
                     <button v-for="tab in tabs" :key="tab" type="button"
@@ -121,24 +124,22 @@ const scroll = (dir: 1 | -1) =>
                 </div>
             </div>
 
-            <!-- FAQ -->
             <section>
                 <h2 class="mb-4 text-h6">The Most Frequented Questions Asked By Travellers</h2>
                 <div>
                     <div v-for="(faq, i) in faqs" :key="faq.question" class="border-b border-gray-300 bg-white">
-                        <button type="button" :aria-expanded="openFaq === i"
+                        <button type="button" :aria-expanded="openFaq.includes(i)"
                             class="flex w-full items-center justify-between px-6 py-4 text-left text-label-m hover:bg-gray-100"
-                            @click="openFaq = openFaq === i ? null : i">
+                            @click="toggleFaq(i)">
                             {{ faq.question }}
-                            <Icon :name="openFaq === i ? 'icon-park-outline:up' : 'icon-park-outline:down'" size="18"
-                                class="text-gray-400" />
+                            <Icon :name="openFaq.includes(i) ? 'icon-park-outline:up' : 'icon-park-outline:down'"
+                                size="18" class="text-gray-400" />
                         </button>
-                        <p v-if="openFaq === i && faq.answer" class="px-6 pb-4 text-body-xs">{{ faq.answer }}</p>
+                        <p v-if="openFaq.includes(i) && faq.answer" class="px-6 pb-4 text-body-xs">{{ faq.answer }}</p>
                     </div>
                 </div>
             </section>
 
-            <!-- Reviews -->
             <div v-if="reviews.length" class="flex items-center gap-2">
                 <button type="button" class="text-primary-500" aria-label="Previous reviews" @click="scroll(-1)">
                     <Icon name="icon-park-outline:left" size="20" />
@@ -153,7 +154,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                            }}</span>
+                                }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>
@@ -165,7 +166,6 @@ const scroll = (dir: 1 | -1) =>
                 </button>
             </div>
 
-            <!-- Rates -->
             <section v-if="rates.length">
                 <h2 class="mb-4 text-h6">Review Rates:</h2>
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-5">

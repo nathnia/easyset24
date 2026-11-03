@@ -159,3 +159,17 @@ export function toRates(s?: LiteApiReviewsResponse["sentimentAnalysis"]) {
     .slice(0, 5)
     .map((c) => ({ label: c.name, score: Number(c.rating.toFixed(1)) }));
 }
+
+// ---- GET /data/facilities (facility ids for the hotel search filter)
+
+export interface Facility {
+  id: number;
+  name: string;
+}
+
+// Accepts { facility_id, facility } and the other field names (facilityId, name) used by LiteAPI
+export function toFacility(f: any): Facility | null {
+  const id = f?.facility_id ?? f?.facilityId ?? f?.id;
+  const name = f?.facility ?? f?.facility_name ?? f?.name;
+  return id != null && name ? { id: Number(id), name: String(name) } : null;
+}

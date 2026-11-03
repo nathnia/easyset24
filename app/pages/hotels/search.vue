@@ -8,13 +8,22 @@ const city = computed(() => String(route.query.cityName || 'Jakarta'))
 const country = computed(() => String(route.query.countryCode || 'ID'))
 
 const store = useHotelsStore()
-const { cards: hotels, loading, loadingMore, error, hasMore } = storeToRefs(store)
+const { cards: hotels, loading, loadingMore, error, hasMore, facilities, facilityIds } = storeToRefs(store)
 
 // Runs on the server too, so the first page is already rendered on load
 await useAsyncData('hotels', async () => {
     await store.fetchHotels(city.value, country.value)
     return true
-}, { watch: [city, country] })
+}, { watch: [city, country, facilityIds] })
+
+// Real facility filter (LiteAPI facilityIds); replaces the mock "Popular Filters" group
+useAsyncData('facilities', async () => {
+    await store.fetchFacilities()
+    return true
+})
+const showAllFacilities = ref(false)
+const shownFacilities = computed(() => showAllFacilities.value ? facilities.value : facilities.value.slice(0, 6))
+const otherGroups = filterGroups.filter((g) => g.key !== 'popular')
 
 const mapZoom = 11
 const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
@@ -136,7 +145,24 @@ const fillStyle = computed(() => ({
                     </label>
                 </div>
 
-                <div v-for="g in filterGroups" :key="g.key" class="mt-6">
+                <div v-if="facilities.length" class="mt-6">
+                    <h3 class="text-label-m">Facilities</h3>
+                    <ul class="mt-2 space-y-2" :class="{ 'max-h-72 overflow-y-auto': showAllFacilities }">
+                        <li v-for="f in shownFacilities" :key="f.id">
+                            <label class="flex cursor-pointer items-center gap-2 text-body-xs text-gray-500">
+                                <input v-model="facilityIds" type="checkbox" :value="f.id" class="filter-check" />
+                                {{ f.name }}
+                            </label>
+                        </li>
+                    </ul>
+                    <button type="button" class="mt-1 flex items-center gap-1 text-body-xxs text-primary-500"
+                        @click="showAllFacilities = !showAllFacilities">
+                        {{ showAllFacilities ? 'Show Less' : 'Show More' }}
+                        <Icon :name="showAllFacilities ? 'icon-park-outline:up' : 'icon-park-outline:down'" size="12" />
+                    </button>
+                </div>
+
+                <div v-for="g in otherGroups" :key="g.key" class="mt-6">
                     <h3 class="text-label-m">{{ g.title }}</h3>
                     <ul class="mt-2 space-y-2">
                         <li v-for="o in g.options" :key="o">

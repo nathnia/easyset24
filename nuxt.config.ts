@@ -1,6 +1,5 @@
 import tailwindcss from "@tailwindcss/vite";
 
-// https://nuxt.com/docs/4.x/api/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
@@ -9,7 +8,6 @@ export default defineNuxtConfig({
 
   css: ["~/assets/css/main.css"],
 
-  // Private (server only). Set NUXT_LITEAPI_KEY in .env
   runtimeConfig: {
     liteapiKey: "",
   },
