@@ -5,6 +5,7 @@ import {
   toReviewCard,
   toRates,
   toFacility,
+  toRoomOffers,
   formatPrice,
 } from "~/utils/liteapi";
 import type {
@@ -14,7 +15,9 @@ import type {
   LiteApiHotelDetailResponse,
   LiteApiReviewsResponse,
   LiteApiMinRatesResponse,
+  LiteApiRatesResponse,
   PriceState,
+  RoomOffer,
   StayInfo,
 } from "~/utils/liteapi";
 
@@ -50,6 +53,10 @@ export const useHotelsStore = defineStore("hotels", {
     detailError: "",
     reviews: [] as ReturnType<typeof toReviewCard>[],
     rates: [] as ReturnType<typeof toRates>,
+    rooms: [] as RoomOffer[],
+    roomsLoading: false,
+    roomsError: "",
+    roomsKey: "",
   }),
 
   getters: {
@@ -157,6 +164,35 @@ export const useHotelsStore = defineStore("hotels", {
           e?.data?.statusMessage || e?.statusMessage || "Failed to load hotel.";
       } finally {
         this.detailLoading = false;
+      }
+    },
+
+    async fetchRooms(id: string, stay: StayInfo) {
+      const key = `${id}|${stay.checkin}|${stay.checkout}|${stay.adults}`;
+      if (this.roomsKey === key && !this.roomsError) return;
+      this.roomsKey = key;
+      this.rooms = [];
+      this.roomsError = "";
+      this.roomsLoading = true;
+      try {
+        const res = await $fetch<LiteApiRatesResponse>("/api/rates", {
+          method: "POST",
+          body: {
+            hotelId: id,
+            checkin: stay.checkin,
+            checkout: stay.checkout,
+            adults: stay.adults,
+          },
+        });
+        if (this.roomsKey !== key) return;
+        const roomsById = this.detail?.id === id ? this.detail.roomsById : {};
+        this.rooms = toRoomOffers(res, roomsById);
+      } catch (e: any) {
+        if (this.roomsKey !== key) return;
+        this.roomsError =
+          e?.data?.statusMessage || e?.statusMessage || "Failed to load rooms.";
+      } finally {
+        if (this.roomsKey === key) this.roomsLoading = false;
       }
     },
 

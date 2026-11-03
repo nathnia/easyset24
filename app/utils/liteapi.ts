@@ -47,6 +47,17 @@ export function toHotelCard(
   };
 }
 
+export interface LiteApiRoom {
+  id: number | string;
+  roomName?: string;
+  description?: string;
+  roomSizeSquare?: number;
+  roomSizeUnit?: string;
+  maxOccupancy?: number;
+  bedTypes?: { quantity?: number; bedType?: string; bedSize?: string }[];
+  photos?: { url?: string; hd_url?: string }[];
+}
+
 export interface LiteApiHotelDetail {
   id: string;
   name: string;
@@ -54,6 +65,7 @@ export interface LiteApiHotelDetail {
   main_photo?: string;
   hotelImages?: { url?: string; urlHd?: string; caption?: string }[];
   hotelFacilities?: (string | { name?: string })[];
+  rooms?: LiteApiRoom[];
   address?: string;
   city?: string;
   country?: string;
@@ -114,6 +126,9 @@ export function toHotelDetail(h: LiteApiHotelDetail) {
           "icon-park-outline:check-one",
       })),
     address: [h.address, h.city, h.country].filter(Boolean).join(", "),
+    roomsById: Object.fromEntries(
+      (h.rooms ?? []).map((r) => [String(r.id), r]),
+    ) as Record<string, LiteApiRoom>,
   };
 }
 
@@ -196,3 +211,91 @@ export function formatPrice(price?: PriceState) {
   if (price === null) return "Not available";
   return `$${Math.round(price).toLocaleString("en-US")}`;
 }
+
+// ---- POST /hotels/rates (room offers) ----
+
+interface Money {
+  amount?: number;
+  currency?: string;
+}
+
+interface LiteApiRate {
+  rateId?: string;
+  name?: string;
+  boardName?: string;
+  maxOccupancy?: number;
+  mappedRoomId?: number | string;
+  retailRate?: { total?: Money[]; suggestedSellingPrice?: Money[] };
+  cancellationPolicies?: {
+    refundableTag?: string;
+    cancelPolicyInfos?: { cancelTime?: string }[];
+  };
+}
+
+interface LiteApiRoomType {
+  roomTypeId?: string;
+  offerId?: string;
+  rates?: LiteApiRate[];
+  suggestedSellingPrice?: Money;
+  offerRetailRate?: Money;
+}
+
+export interface LiteApiRatesResponse {
+  data?: { hotelId: string; roomTypes?: LiteApiRoomType[] }[];
+}
+
+// One roomType = one bookable offer (one rate per room when several rooms are requested)
+export function toRoomOffers(
+  res: LiteApiRatesResponse,
+  roomsById: Record<string, LiteApiRoom> = {},
+) {
+  const types = res.data?.[0]?.roomTypes ?? [];
+  const offers = types.flatMap((t) => {
+    const rates = t.rates ?? [];
+    const first = rates[0];
+    if (!t.offerId || !first) return [];
+
+    const sum = rates.reduce(
+      (acc, r) =>
+        acc +
+        (r.retailRate?.suggestedSellingPrice?.[0]?.amount ??
+          r.retailRate?.total?.[0]?.amount ??
+          0),
+      0,
+    );
+    const price =
+      t.suggestedSellingPrice?.amount ?? (sum || t.offerRetailRate?.amount);
+    if (price === undefined) return [];
+
+    const room = roomsById[String(first.mappedRoomId)];
+    const cancel = first.cancellationPolicies;
+    const cancelTime = cancel?.cancelPolicyInfos?.[0]?.cancelTime;
+    const photo = room?.photos?.[0];
+
+    return [
+      {
+        offerId: t.offerId,
+        name: room?.roomName || first.name || "Room",
+        rateName: first.name ?? "",
+        board: first.boardName || "Room only",
+        rooms: rates.length,
+        price,
+        refundable: cancel?.refundableTag === "RFN",
+        cancelUntil: cancelTime ? cancelTime.slice(0, 10) : "",
+        image: photo?.hd_url || photo?.url || "",
+        beds: (room?.bedTypes ?? [])
+          .filter((b) => b.bedType)
+          .map((b) => `${b.quantity ?? 1} ${b.bedType}`)
+          .join(", "),
+        size: room?.roomSizeSquare
+          ? `${room.roomSizeSquare} ${room.roomSizeUnit ?? "m²"}`
+          : "",
+        maxOccupancy: first.maxOccupancy ?? room?.maxOccupancy,
+        description: toParagraphs(room?.description)[0] ?? "",
+      },
+    ];
+  });
+  return offers.sort((a, b) => a.price - b.price);
+}
+
+export type RoomOffer = ReturnType<typeof toRoomOffers>[number];

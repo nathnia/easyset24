@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useHotelsStore } from '~/stores/hotels'
-import { stayFromQuery } from '~/utils/liteapi'
+import { formatPrice, stayFromQuery } from '~/utils/liteapi'
 
 const route = useRoute()
 const store = useHotelsStore()
-const { detail: hotel, detailLoading, detailError, detailPrice, reviews, rates } = storeToRefs(store)
+const { detail: hotel, detailLoading, detailError, detailPrice, reviews, rates, rooms, roomsLoading, roomsError } = storeToRefs(store)
 const stay = computed(() => stayFromQuery(route.query))
 
 await useAsyncData(`hotel-${route.params.id}`, async () => {
@@ -27,6 +27,20 @@ useHead({ title: computed(() => hotel.value?.name ?? 'Hotel Information') })
 const tabs = ['Place Details', 'Info & Prices', 'Rooms & Beds', 'Place Rules']
 const activeTab = ref(tabs[0])
 const liked = ref(false)
+
+watch(activeTab, (t) => {
+    if (t === 'Rooms & Beds') store.fetchRooms(String(route.params.id), stay.value)
+})
+
+const cancelText = (o: { refundable: boolean; cancelUntil: string }) => {
+    if (!o.refundable) return 'Non-refundable'
+    return o.cancelUntil ? 'Free cancellation until ' + o.cancelUntil : 'Free cancellation'
+}
+const roomTitle = (o: { rooms: number; name: string }) =>
+    o.rooms > 1 ? o.rooms + ' x ' + o.name : o.name
+
+const bookLink = (offerId: string) =>
+    `/hotels/payment?hotelId=${route.params.id}&offerId=${encodeURIComponent(offerId)}&checkin=${stay.value.checkin}&checkout=${stay.value.checkout}&adults=${stay.value.adults}`
 
 const faqs = [
     { question: 'How And When Do I Pay?', answer: 'Since this option is a non-refundable reservation and there is no cancellation opportunity, payment is usually processed at the time of booking or shortly thereafter.' },
@@ -106,7 +120,7 @@ const scroll = (dir: 1 | -1) =>
                             <div class="flex flex-col gap-3">
                                 <p class="text-body-xs">
                                     <b class="text-label-m">{{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults'
-                                    }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
+                                        }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
                                     Rooms ,Double Bed
                                 </p>
                                 <p class="flex items-center gap-2 text-body-xs">
@@ -131,6 +145,55 @@ const scroll = (dir: 1 | -1) =>
                                 </div>
                             </div>
                         </div>
+                    </template>
+
+                    <template v-else-if="activeTab === 'Rooms & Beds'">
+                        <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading rooms...</p>
+                        <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
+                            }}</p>
+                        <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
+                            No rooms available for these dates.
+                        </p>
+                        <ul v-else class="space-y-4">
+                            <li v-for="o in rooms" :key="o.offerId"
+                                class="flex flex-col gap-4 rounded-md border border-gray-300 p-4 sm:flex-row">
+                                <img v-if="o.image" :src="o.image" :alt="o.name"
+                                    class="h-40 w-full shrink-0 rounded-sm object-cover sm:w-56 sm:self-center" />
+                                <div class="flex flex-1 flex-col gap-1.5 text-body-xs">
+                                    <h3 class="text-label-m">{{ roomTitle(o) }}</h3>
+                                    <p v-if="o.rateName && o.rateName !== o.name" class="text-gray-500">{{ o.rateName }}
+                                    </p>
+                                    <p v-if="o.description" class="line-clamp-2 text-gray-500">{{ o.description }}</p>
+                                    <p v-if="o.beds || o.size" class="text-gray-500">
+                                        {{ [o.beds, o.size].filter(Boolean).join(' | ') }}
+                                    </p>
+                                    <p class="flex items-center gap-2">
+                                        <Icon name="icon-park-outline:cup" size="16" />{{ o.board }}
+                                    </p>
+                                    <p v-if="o.maxOccupancy" class="flex items-center gap-2">
+                                        <Icon name="icon-park-outline:user" size="16" />Up to {{ o.maxOccupancy }}
+                                        guests
+                                    </p>
+                                    <p class="flex items-center gap-2"
+                                        :class="o.refundable ? 'text-success-dark' : 'text-error-light'">
+                                        <Icon
+                                            :name="o.refundable ? 'icon-park-outline:check-one' : 'icon-park-outline:attention'"
+                                            size="16" />
+                                        {{ cancelText(o) }}
+                                    </p>
+                                </div>
+                                <div class="flex flex-col justify-end gap-2 sm:w-44 sm:text-right">
+                                    <p>
+                                        <span class="text-h6 text-success-dark">{{ formatPrice(o.price) }}</span>
+                                        <span class="ml-1 text-label-m">Total</span>
+                                    </p>
+                                    <NuxtLink :to="bookLink(o.offerId)"
+                                        class="flex h-10 items-center justify-center rounded-sm bg-primary-500 px-6 text-button-l text-white hover:bg-primary-600">
+                                        Select
+                                    </NuxtLink>
+                                </div>
+                            </li>
+                        </ul>
                     </template>
 
                     <p v-else class="py-10 text-center text-body-s text-gray-500">Coming soon.</p>
@@ -167,7 +230,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                            }}</span>
+                                }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>
