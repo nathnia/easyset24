@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { useHotelsStore } from '~/stores/hotels'
+import { stayFromQuery } from '~/utils/liteapi'
 
 const route = useRoute()
 const store = useHotelsStore()
-const { detail: hotel, detailLoading, detailError, reviews, rates } = storeToRefs(store)
+const { detail: hotel, detailLoading, detailError, detailPrice, reviews, rates } = storeToRefs(store)
+const stay = computed(() => stayFromQuery(route.query))
 
 await useAsyncData(`hotel-${route.params.id}`, async () => {
-    const id = String(route.params.id)
-    await Promise.all([store.fetchHotel(id), store.fetchReviews(id)])
+    await store.fetchHotel(String(route.params.id))
     return true
 }, { watch: [() => route.params.id] })
+
+useLazyAsyncData('hotel-extra', async () => {
+    const id = String(route.params.id)
+    const p = store.prices[id]
+    await Promise.all([
+        store.fetchReviews(id),
+        p === undefined || p === 'error' ? store.fetchPrices([id], stay.value) : Promise.resolve(),
+    ])
+    return true
+}, { server: false, watch: [() => route.params.id] })
 
 useHead({ title: computed(() => hotel.value?.name ?? 'Hotel Information') })
 
@@ -94,15 +105,17 @@ const scroll = (dir: 1 | -1) =>
 
                             <div class="flex flex-col gap-3">
                                 <p class="text-body-xs">
-                                    <b class="text-label-m">2 Adults ,3 Children ,4 Nights</b> | Two Rooms ,Double Bed
+                                    <b class="text-label-m">{{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults'
+                                    }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
+                                    Rooms ,Double Bed
                                 </p>
                                 <p class="flex items-center gap-2 text-body-xs">
                                     <Icon name="icon-park-outline:local" size="18" class="text-primary-500" />
                                     {{ hotel.address }}
                                 </p>
                                 <p class="mt-auto md:text-right">
-                                    <span class="text-h6 text-success-dark">{{ hotel.price }}</span>
-                                    <span class="ml-1 text-label-m">Per night</span>
+                                    <span class="text-h6 text-success-dark">{{ detailPrice }}</span>
+                                    <span class="ml-1 text-label-m">Total</span>
                                 </p>
                                 <div class="flex gap-3 md:justify-end">
                                     <button type="button" aria-label="Add to favourites"
@@ -154,7 +167,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                                }}</span>
+                            }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>

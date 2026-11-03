@@ -5,6 +5,7 @@ import {
   toReviewCard,
   toRates,
   toFacility,
+  formatPrice,
 } from "~/utils/liteapi";
 import type {
   Facility,
@@ -12,13 +13,32 @@ import type {
   LiteApiHotelsResponse,
   LiteApiHotelDetailResponse,
   LiteApiReviewsResponse,
+  LiteApiMinRatesResponse,
+  PriceState,
+  StayInfo,
 } from "~/utils/liteapi";
 
 const LIMIT = 20;
 
+const slim = (h: LiteApiHotel): LiteApiHotel => ({
+  id: h.id,
+  name: h.name,
+  main_photo: h.main_photo,
+  thumbnail: h.thumbnail,
+  address: h.address,
+  city: h.city,
+  country: h.country,
+  stars: h.stars,
+  starRating: h.starRating,
+  rating: h.rating,
+  reviewCount: h.reviewCount,
+});
+
 export const useHotelsStore = defineStore("hotels", {
   state: () => ({
     items: [] as LiteApiHotel[],
+    prices: {} as Record<string, PriceState>,
+    stay: null as StayInfo | null,
     loading: false,
     loadingMore: false,
     error: "",
@@ -33,7 +53,10 @@ export const useHotelsStore = defineStore("hotels", {
   }),
 
   getters: {
-    cards: (state) => state.items.map(toHotelCard),
+    cards: (state) =>
+      state.items.map((h) => toHotelCard(h, state.prices[h.id], state.stay)),
+    detailPrice: (state) =>
+      state.detail ? formatPrice(state.prices[state.detail.id]) : "",
   },
 
   actions: {
@@ -46,9 +69,43 @@ export const useHotelsStore = defineStore("hotels", {
         : {};
     },
 
-    async fetchHotels(city: string, country: string) {
+    async fetchPrices(ids: string[], stay: StayInfo) {
+      if (!ids.length) return;
+      const body = {
+        hotelIds: ids,
+        checkin: stay.checkin,
+        checkout: stay.checkout,
+        adults: stay.adults,
+      };
+
+      let res: LiteApiMinRatesResponse | undefined;
+      for (let attempt = 0; attempt < 2 && !res; attempt++) {
+        try {
+          res = await $fetch<LiteApiMinRatesResponse>("/api/min-rates", {
+            method: "POST",
+            body,
+          });
+        } catch {
+          // retry once
+        }
+      }
+
+      if (!res) {
+        for (const id of ids) this.prices[id] = "error";
+        return;
+      }
+
+      const found = new Map(
+        res.data.map((r) => [r.hotelId, r.suggestedSellingPrice ?? r.price]),
+      );
+      for (const id of ids) this.prices[id] = found.get(id) ?? null;
+    },
+
+    async fetchHotels(city: string, country: string, stay: StayInfo) {
       this.loading = true;
       this.error = "";
+      this.stay = stay;
+      this.prices = {};
       try {
         const res = await $fetch<LiteApiHotelsResponse>("/api/hotels", {
           query: {
@@ -58,7 +115,7 @@ export const useHotelsStore = defineStore("hotels", {
             ...this.facilityQuery(),
           },
         });
-        this.items = res.data;
+        this.items = res.data.map(slim);
         this.hasMore = res.data.length === LIMIT;
       } catch (e: any) {
         this.items = [];
@@ -130,7 +187,7 @@ export const useHotelsStore = defineStore("hotels", {
             ...this.facilityQuery(),
           },
         });
-        this.items = [...this.items, ...res.data];
+        this.items = [...this.items, ...res.data.map(slim)];
         this.hasMore = res.data.length === LIMIT;
       } catch {
         this.hasMore = false;

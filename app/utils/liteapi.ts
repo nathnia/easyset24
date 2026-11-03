@@ -1,5 +1,3 @@
-// Types and mapper for LiteAPI GET /data/hotels
-
 export interface LiteApiHotel {
   id: string;
   name: string;
@@ -18,14 +16,16 @@ export interface LiteApiHotelsResponse {
   data: LiteApiHotel[];
 }
 
+// number = price, null = hotel not in min-rates (sold out), "error" = request failed
+export type PriceState = number | null | "error";
+
 const PLACEHOLDER_IMAGE = "https://picsum.photos/seed/easyset-hotel/800/600";
 
-// /data/hotels and /data/hotel return no price, so price is a hardcoded mock: $40 per star.
-// Replace with real rates from POST /hotels/rates later.
-const mockPrice = (stars?: number) => `$${(stars || 3) * 40}`;
-
-// Shape expected by <HotelCard>.
-export function toHotelCard(h: LiteApiHotel) {
+export function toHotelCard(
+  h: LiteApiHotel,
+  price?: PriceState,
+  stay?: StayInfo | null,
+) {
   const stars = h.stars ?? h.starRating;
   return {
     id: h.id,
@@ -37,11 +37,15 @@ export function toHotelCard(h: LiteApiHotel) {
       ? `${h.reviewCount.toLocaleString("en-US")} Reviews`
       : "",
     rating: h.rating ? h.rating.toFixed(1) : "-",
-    price: mockPrice(stars),
+    price: formatPrice(price),
+    guests: stay
+      ? `${stay.adults} ${stay.adults === 1 ? "Adult" : "Adults"}`
+      : undefined,
+    nights: stay
+      ? `${stay.nights} ${stay.nights === 1 ? "Night" : "Nights"}`
+      : undefined,
   };
 }
-
-// ---- GET /data/hotel (details of one hotel)
 
 export interface LiteApiHotelDetail {
   id: string;
@@ -62,7 +66,6 @@ export interface LiteApiHotelDetailResponse {
   data: LiteApiHotelDetail;
 }
 
-// facility keyword -> icon (icons already used by the detail page)
 const FACILITY_ICONS: [RegExp, string][] = [
   [/wi-?fi|internet/i, "icon-park-outline:wifi"],
   [/parking/i, "icon-park-outline:parking"],
@@ -74,7 +77,6 @@ const FACILITY_ICONS: [RegExp, string][] = [
   [/coffee|tea/i, "icon-park-outline:coffee-machine"],
 ];
 
-// Description may contain HTML. Strip tags (no v-html) and split into paragraphs.
 function toParagraphs(html?: string) {
   return (html ?? "")
     .replace(/<\/(p|div|li)>|<br\s*\/?>/gi, "\n")
@@ -86,7 +88,6 @@ function toParagraphs(html?: string) {
     .filter(Boolean);
 }
 
-// Shape expected by pages/hotels/[id].vue
 export function toHotelDetail(h: LiteApiHotelDetail) {
   const urls = (h.hotelImages ?? [])
     .map((i) => i.urlHd || i.url)
@@ -97,7 +98,6 @@ export function toHotelDetail(h: LiteApiHotelDetail) {
   return {
     id: h.id,
     name: h.name,
-    // page grid needs exactly 5 images
     images: Array.from(
       { length: 5 },
       (_, i) => urls[i] || h.main_photo || PLACEHOLDER_IMAGE,
@@ -114,11 +114,8 @@ export function toHotelDetail(h: LiteApiHotelDetail) {
           "icon-park-outline:check-one",
       })),
     address: [h.address, h.city, h.country].filter(Boolean).join(", "),
-    price: mockPrice(h.starRating),
   };
 }
-
-// ---- GET /data/reviews (guest reviews of one hotel)
 
 export interface LiteApiReview {
   averageScore?: number;
@@ -134,17 +131,14 @@ export interface LiteApiReview {
 export interface LiteApiReviewsResponse {
   data: LiteApiReview[];
   total?: number;
-  // only when getSentiment=true
   sentimentAnalysis?: { categories?: { name: string; rating: number }[] };
 }
 
-// Shape expected by the review cards in pages/hotels/[id].vue
 export function toReviewCard(r: LiteApiReview) {
   const name = r.name?.trim() || "Guest";
   const country = (r.country ?? "").toLowerCase();
   return {
     name,
-    // API has no guest photos: placeholder face, stable per name
     avatar: `https://i.pravatar.cc/200?u=${encodeURIComponent(name)}`,
     country: /^[a-z]{2}$/.test(country) ? country : "",
     score: r.averageScore ? `${r.averageScore}/10` : "",
@@ -152,7 +146,6 @@ export function toReviewCard(r: LiteApiReview) {
   };
 }
 
-// Shape expected by the "Review Rates" bars (score out of 10)
 export function toRates(s?: LiteApiReviewsResponse["sentimentAnalysis"]) {
   return (s?.categories ?? [])
     .filter((c) => c.name && typeof c.rating === "number")
@@ -160,16 +153,46 @@ export function toRates(s?: LiteApiReviewsResponse["sentimentAnalysis"]) {
     .map((c) => ({ label: c.name, score: Number(c.rating.toFixed(1)) }));
 }
 
-// ---- GET /data/facilities (facility ids for the hotel search filter)
-
 export interface Facility {
   id: number;
   name: string;
 }
 
-// Accepts { facility_id, facility } and the other field names (facilityId, name) used by LiteAPI
 export function toFacility(f: any): Facility | null {
   const id = f?.facility_id ?? f?.facilityId ?? f?.id;
   const name = f?.facility ?? f?.facility_name ?? f?.name;
   return id != null && name ? { id: Number(id), name: String(name) } : null;
+}
+
+export interface LiteApiMinRatesResponse {
+  data: { hotelId: string; price: number; suggestedSellingPrice?: number }[];
+}
+
+const DAY = 86400000;
+const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+const isDate = (v: unknown): v is string =>
+  typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+export function stayFromQuery(query: Record<string, unknown>) {
+  const checkin = isDate(query.checkin)
+    ? query.checkin
+    : isoDate(Date.now() + 7 * DAY);
+  let checkout = isDate(query.checkout)
+    ? query.checkout
+    : isoDate(Date.parse(checkin) + 2 * DAY);
+  if (Date.parse(checkout) <= Date.parse(checkin)) {
+    checkout = isoDate(Date.parse(checkin) + DAY);
+  }
+  const adults = Math.min(Math.max(Number(query.adults) || 2, 1), 9);
+  const nights = Math.round((Date.parse(checkout) - Date.parse(checkin)) / DAY);
+  return { checkin, checkout, adults, nights };
+}
+
+export type StayInfo = ReturnType<typeof stayFromQuery>;
+
+export function formatPrice(price?: PriceState) {
+  if (price === undefined) return "...";
+  if (price === "error") return "Price unavailable";
+  if (price === null) return "Not available";
+  return `$${Math.round(price).toLocaleString("en-US")}`;
 }

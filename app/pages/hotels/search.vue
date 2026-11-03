@@ -1,26 +1,34 @@
 <script setup lang="ts">
 import { filterGroups } from '~/data/hotels'
 import { useHotelsStore } from '~/stores/hotels'
+import { stayFromQuery } from '~/utils/liteapi'
 
 const route = useRoute()
 const city = computed(() => String(route.query.cityName || 'Jakarta'))
-// /data/hotels needs a country; default is Indonesia. Override with ?countryCode=XX
 const country = computed(() => String(route.query.countryCode || 'ID'))
+
+const stay = computed(() => stayFromQuery(route.query))
 
 const store = useHotelsStore()
 const { cards: hotels, loading, loadingMore, error, hasMore, facilities, facilityIds } = storeToRefs(store)
 
-// Runs on the server too, so the first page is already rendered on load
 await useAsyncData('hotels', async () => {
-    await store.fetchHotels(city.value, country.value)
+    await store.fetchHotels(city.value, country.value, stay.value)
     return true
-}, { watch: [city, country, facilityIds] })
+}, { watch: [city, country, facilityIds, () => stay.value.checkin, () => stay.value.checkout, () => stay.value.adults] })
 
-// Real facility filter (LiteAPI facilityIds); replaces the mock "Popular Filters" group
-useAsyncData('facilities', async () => {
+useLazyAsyncData('prices', async () => {
+    const ids = store.items
+        .map((h) => h.id)
+        .filter((id) => store.prices[id] === undefined || store.prices[id] === 'error')
+    await store.fetchPrices(ids, stay.value)
+    return true
+}, { server: false, watch: [() => store.items] })
+
+useLazyAsyncData('facilities', async () => {
     await store.fetchFacilities()
     return true
-})
+}, { server: false })
 const showAllFacilities = ref(false)
 const shownFacilities = computed(() => showAllFacilities.value ? facilities.value : facilities.value.slice(0, 6))
 const otherGroups = filterGroups.filter((g) => g.key !== 'popular')
@@ -189,7 +197,8 @@ const fillStyle = computed(() => ({
                     No hotels found for "{{ city }}" ({{ country }}).
                 </p>
                 <div v-else class="space-y-6">
-                    <HotelCard v-for="h in hotels" :key="h.id" :hotel="h" :to="`/hotels/${h.id}`" />
+                    <HotelCard v-for="h in hotels" :key="h.id" :hotel="h"
+                        :to="`/hotels/${h.id}?checkin=${stay.checkin}&checkout=${stay.checkout}&adults=${stay.adults}`" />
                 </div>
 
                 <div class="mt-8 flex flex-col justify-between gap-4 sm:flex-row">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useLocationsStore } from '~/stores/locations'
+import { stayFromQuery } from '~/utils/liteapi'
 
 const props = withDefaults(defineProps<{
     type?: 'hotel' | 'flight'
@@ -39,27 +40,43 @@ const c = configs[props.type]
 
 const first = ref(props.place ?? c.first)
 
-// Hotel form: city suggestions from LiteAPI (country fixed to Indonesia)
 const locations = useLocationsStore()
 const { cities } = storeToRefs(locations)
 if (props.type === 'hotel') {
-    useAsyncData('cities', async () => {
+    useLazyAsyncData('cities', async () => {
         await locations.fetchCities('ID')
         return true
-    })
+    }, { server: false })
 }
 const second = ref(props.vip ?? c.second)
 const third = ref(c.third)
 
+const route = useRoute()
+const stay = stayFromQuery(route.query)
+const checkin = ref(stay.checkin)
+const checkout = ref(stay.checkout)
+const adults = ref(stay.adults)
+const today = new Date().toISOString().slice(0, 10)
+
 function search() {
     if (props.type === 'hotel') {
-        navigateTo({ path: c.to, query: { cityName: first.value.trim() } })
+        navigateTo({ path: c.to, query: { cityName: first.value.trim(), checkin: checkin.value, checkout: checkout.value, adults: adults.value } })
     } else if (c.to) {
         navigateTo(c.to)
     }
 }
 
-const field = 'flex h-[50px] items-center gap-3 border border-gray-300 bg-white px-3 text-body-s md:-ml-px md:first:ml-0'
+// display only: "2026-12-18" -> "18 Dec 2026"
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+function fmt(iso: string) {
+    const [y, m, d] = (iso || '').split('-')
+    return y && m && d ? `${d} ${MONTHS[Number(m) - 1]} ${y}` : 'Select date'
+}
+function openPicker(e: Event) {
+    (e.target as HTMLInputElement).showPicker?.()
+}
+
+const field = 'relative flex h-[50px] items-center gap-3 border border-gray-300 bg-white px-3 text-body-s md:-ml-px md:first:ml-0'
 const select = 'w-full appearance-none bg-transparent outline-none'
 </script>
 
@@ -95,7 +112,10 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                 <label class="mb-1 block text-label-m">{{ c.labels[2] }}</label>
                 <div :class="field">
                     <Icon name="icon-park-outline:user" size="22" class="shrink-0 text-primary-400" />
-                    <span class="whitespace-nowrap">2 Adults - 3 Children</span>
+                    <select v-if="type === 'hotel'" v-model.number="adults" :class="[select, 'w-28']">
+                        <option v-for="n in 6" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}</option>
+                    </select>
+                    <span v-else class="whitespace-nowrap">2 Adults - 3 Children</span>
                     <select v-model="third" :class="[select, 'ml-2']">
                         <option v-for="o in c.thirdOptions" :key="o">{{ o }}</option>
                     </select>
@@ -107,7 +127,14 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                 <label class="mb-1 block text-label-m">{{ c.labels[3] }}</label>
                 <div :class="field">
                     <Icon name="icon-park-outline:calendar" size="22" class="shrink-0 text-primary-400" />
-                    <span class="whitespace-nowrap">18 Dec 2023 - 23 Dec 2023</span>
+                    <template v-if="type === 'hotel'">
+                        <span class="whitespace-nowrap">{{ fmt(checkin) }} - {{ fmt(checkout) }}</span>
+                        <input v-model="checkin" type="date" :min="today" required aria-label="Check in"
+                            class="absolute inset-y-0 left-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                        <input v-model="checkout" type="date" :min="checkin" required aria-label="Check out"
+                            class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                    </template>
+                    <span v-else class="whitespace-nowrap">18 Dec 2023 - 23 Dec 2023</span>
                 </div>
             </div>
 

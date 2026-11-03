@@ -1,5 +1,5 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
     hotel: {
         name: string
         image: string
@@ -11,12 +11,17 @@ withDefaults(defineProps<{
         rating: string
         discount?: string
         price: string
+        guests?: string
+        nights?: string
         left?: string
         vip?: boolean
     }
     compact?: boolean
     to?: string
 }>(), { compact: false, to: '#' })
+
+const guests = computed(() => props.hotel.guests ?? '1 Adult, 2 Children')
+const nights = computed(() => props.hotel.nights ?? '4 Nights')
 </script>
 
 <template>
@@ -49,7 +54,6 @@ withDefaults(defineProps<{
             </div>
         </div>
 
-        <!-- Info -->
         <div class="flex flex-1 flex-col justify-between gap-5 py-3 pr-3"
             :class="compact ? 'md:flex-col md:py-2 md:pr-2' : 'md:flex-row'">
             <div class="flex flex-col justify-between gap-4">
@@ -65,10 +69,10 @@ withDefaults(defineProps<{
                             </li>
                             <li class="flex items-center gap-4">
                                 <span class="flex items-center gap-2">
-                                    <Icon name="icon-park-outline:user" size="20" />1 Adult, 2 Children
+                                    <Icon name="icon-park-outline:user" size="20" />{{ guests }}
                                 </span>
                                 <span class="flex items-center gap-2">
-                                    <Icon name="icon-park-outline:time" size="20" />4 Nights
+                                    <Icon name="icon-park-outline:time" size="20" />{{ nights }}
                                 </span>
                             </li>
                         </template>
@@ -85,7 +89,6 @@ withDefaults(defineProps<{
                 </div>
             </div>
 
-            <!-- Price -->
             <div class="flex flex-col justify-end gap-1" :class="compact ? 'md:w-auto' : 'md:w-67.5 md:text-right'">
                 <p class="flex items-baseline" :class="compact ? 'gap-2' : 'gap-6 md:justify-end'">
                     <span v-if="hotel.discount" class="text-error-light"
