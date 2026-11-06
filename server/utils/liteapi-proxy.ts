@@ -1,6 +1,8 @@
 import type { H3Event } from "h3";
 
 const BASE_URL = "https://api.liteapi.travel/v3.0";
+// prebook + book live on a different host
+export const BOOK_URL = "https://book.liteapi.travel/v3.0";
 
 export function pickQuery(
   event: H3Event,
@@ -28,7 +30,11 @@ export async function liteapi(
   event: H3Event,
   path: string,
   query: Record<string, string> = {},
-  options: { cache?: boolean; body?: Record<string, unknown> } = {},
+  options: {
+    cache?: boolean;
+    body?: Record<string, unknown>;
+    base?: string;
+  } = {},
 ) {
   const { liteapiKey } = useRuntimeConfig(event);
   if (!liteapiKey) {
@@ -39,7 +45,7 @@ export async function liteapi(
   }
 
   try {
-    const data = await $fetch(`${BASE_URL}${path}`, {
+    const data = await $fetch(`${options.base ?? BASE_URL}${path}`, {
       method: options.body ? "POST" : "GET",
       headers: { "X-API-Key": liteapiKey, accept: "application/json" },
       query,

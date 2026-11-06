@@ -29,7 +29,22 @@ const activeTab = ref(tabs[0])
 const liked = ref(false)
 
 watch(activeTab, (t) => {
-    if (t === 'Rooms & Beds') store.fetchRooms(String(route.params.id), stay.value)
+    if (t === 'Rooms & Beds' || t === 'Info & Prices') store.fetchRooms(String(route.params.id), stay.value)
+})
+
+const priceOptions = computed(() => {
+    const best = new Map<string, (typeof rooms.value)[number]>()
+    for (const o of rooms.value) {
+        const key = o.board + '|' + o.refundable
+        if (!best.has(key)) best.set(key, o)
+    }
+    return [...best.entries()].map(([key, o]) => ({
+        key,
+        board: o.board,
+        price: o.price,
+        refundable: o.refundable,
+        cancelUntil: o.cancelUntil,
+    }))
 })
 
 const cancelText = (o: { refundable: boolean; cancelUntil: string }) => {
@@ -120,7 +135,7 @@ const scroll = (dir: 1 | -1) =>
                             <div class="flex flex-col gap-3">
                                 <p class="text-body-xs">
                                     <b class="text-label-m">{{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults'
-                                        }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
+                                    }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
                                     Rooms ,Double Bed
                                 </p>
                                 <p class="flex items-center gap-2 text-body-xs">
@@ -138,11 +153,57 @@ const scroll = (dir: 1 | -1) =>
                                         <Icon name="icon-park-outline:like" size="18"
                                             :class="liked ? 'text-error-light' : 'text-black'" />
                                     </button>
-                                    <NuxtLink to="/hotels/payment"
-                                        class="flex h-10 flex-1 items-center justify-center rounded-sm bg-primary-500 px-8 text-button-l text-white hover:bg-primary-600 md:w-56 md:flex-none">
+                                    <button type="button"
+                                        class="flex h-10 flex-1 items-center justify-center rounded-sm bg-primary-500 px-8 text-button-l text-white hover:bg-primary-600 md:w-56 md:flex-none"
+                                        @click="activeTab = 'Rooms & Beds'">
                                         Book Now
-                                    </NuxtLink>
+                                    </button>
                                 </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template v-else-if="activeTab === 'Info & Prices'">
+                        <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading prices...</p>
+                        <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
+                        }}</p>
+                        <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
+                            No prices available for these dates.
+                        </p>
+                        <div v-else class="grid gap-8 md:grid-cols-2">
+                            <div>
+                                <h3 class="mb-4 text-label-m">Price Summary</h3>
+                                <ul class="space-y-3 text-body-xs text-gray-500">
+                                    <li class="flex items-center gap-3">
+                                        <Icon name="icon-park-outline:calendar" size="18" />
+                                        {{ stay.checkin }} to {{ stay.checkout }}
+                                        ({{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }})
+                                    </li>
+                                    <li class="flex items-center gap-3">
+                                        <Icon name="icon-park-outline:user" size="18" />
+                                        {{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults' }}
+                                    </li>
+                                </ul>
+                                <p class="mt-6">
+                                    <span class="text-h6 text-success-dark">{{ formatPrice(rooms[0]!.price) }}</span>
+                                    <span class="ml-1 text-label-m">Total, from</span>
+                                </p>
+                                <p class="mt-1 text-body-xs text-gray-500">
+                                    About {{ formatPrice(rooms[0]!.price / stay.nights) }} per night.
+                                    Includes taxes and charges.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="mb-4 text-label-m">Price Options</h3>
+                                <ul class="space-y-3 text-body-xs">
+                                    <li v-for="opt in priceOptions" :key="opt.key"
+                                        class="flex items-center justify-between gap-4 border-b border-gray-300 pb-3">
+                                        <span class="text-gray-500">{{ opt.board }} | {{ cancelText(opt) }}</span>
+                                        <b class="shrink-0 text-label-m text-success-dark">{{ formatPrice(opt.price)
+                                            }}</b>
+                                    </li>
+                                </ul>
                             </div>
                         </div>
                     </template>
@@ -150,7 +211,7 @@ const scroll = (dir: 1 | -1) =>
                     <template v-else-if="activeTab === 'Rooms & Beds'">
                         <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading rooms...</p>
                         <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
-                            }}</p>
+                        }}</p>
                         <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
                             No rooms available for these dates.
                         </p>
@@ -196,7 +257,38 @@ const scroll = (dir: 1 | -1) =>
                         </ul>
                     </template>
 
-                    <p v-else class="py-10 text-center text-body-s text-gray-500">Coming soon.</p>
+                    <template v-else-if="activeTab === 'Place Rules'">
+                        <div class="grid gap-8 md:grid-cols-2">
+                            <div>
+                                <h3 class="mb-4 text-label-m">Check-in And Check-out</h3>
+                                <ul v-if="hotel.rules.checkin || hotel.rules.checkout"
+                                    class="space-y-3 text-body-xs text-gray-500">
+                                    <li v-if="hotel.rules.checkin" class="flex items-center gap-3">
+                                        <Icon name="icon-park-outline:time" size="18" />
+                                        Check-in from {{ hotel.rules.checkin }}
+                                    </li>
+                                    <li v-if="hotel.rules.checkout" class="flex items-center gap-3">
+                                        <Icon name="icon-park-outline:time" size="18" />
+                                        Check-out until {{ hotel.rules.checkout }}
+                                    </li>
+                                </ul>
+                                <p v-else class="text-body-xs text-gray-500">
+                                    The property has not shared its check-in and check-out times.
+                                </p>
+                            </div>
+
+                            <div>
+                                <h3 class="mb-4 text-label-m">Important Information</h3>
+                                <div v-if="hotel.rules.notes.length"
+                                    class="max-h-96 space-y-3 overflow-y-auto text-body-xs text-gray-500">
+                                    <p v-for="(note, i) in hotel.rules.notes" :key="i">{{ note }}</p>
+                                </div>
+                                <p v-else class="text-body-xs text-gray-500">
+                                    The property has not shared any extra information.
+                                </p>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
 
@@ -230,7 +322,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                                }}</span>
+                            }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>

@@ -62,6 +62,12 @@ export interface LiteApiHotelDetail {
   id: string;
   name: string;
   hotelDescription?: string;
+  hotelImportantInformation?: string;
+  checkinCheckoutTimes?: {
+    checkin?: string;
+    checkinStart?: string;
+    checkout?: string;
+  };
   main_photo?: string;
   hotelImages?: { url?: string; urlHd?: string; caption?: string }[];
   hotelFacilities?: (string | { name?: string })[];
@@ -91,7 +97,7 @@ const FACILITY_ICONS: [RegExp, string][] = [
 
 function toParagraphs(html?: string) {
   return (html ?? "")
-    .replace(/<\/(p|div|li)>|<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(p|div|li|ul|ol)[^>]*>|<br\s*\/?>/gi, "\n")
     .replace(/<[^>]*>/g, "")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -126,6 +132,14 @@ export function toHotelDetail(h: LiteApiHotelDetail) {
           "icon-park-outline:check-one",
       })),
     address: [h.address, h.city, h.country].filter(Boolean).join(", "),
+    rules: {
+      checkin:
+        h.checkinCheckoutTimes?.checkinStart ||
+        h.checkinCheckoutTimes?.checkin ||
+        "",
+      checkout: h.checkinCheckoutTimes?.checkout || "",
+      notes: toParagraphs(h.hotelImportantInformation),
+    },
     roomsById: Object.fromEntries(
       (h.rooms ?? []).map((r) => [String(r.id), r]),
     ) as Record<string, LiteApiRoom>,

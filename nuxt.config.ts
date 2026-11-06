@@ -10,6 +10,10 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     liteapiKey: "",
+    public: {
+      // "sandbox" for test payments, "live" for real money
+      liteapiPaymentEnv: "sandbox",
+    },
   },
 
   vite: {
