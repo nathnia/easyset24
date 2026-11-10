@@ -48,6 +48,14 @@ if (props.type === 'hotel') {
         return true
     }, { server: false })
 }
+
+// Flights: From / To airports (IATA codes from LiteAPI), kept in the URL
+const codeFrom = (v: unknown, fallback: string) =>
+    typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : fallback
+const fromCode = ref(codeFrom(useRoute().query.from, 'ARN'))
+const toCode = ref(codeFrom(useRoute().query.to, 'IST'))
+const flightError = ref('')
+
 const second = ref(props.vip ?? c.second)
 const third = ref(c.third)
 
@@ -62,7 +70,12 @@ function search() {
     if (props.type === 'hotel') {
         navigateTo({ path: c.to, query: { cityName: first.value.trim(), checkin: checkin.value, checkout: checkout.value, adults: adults.value } })
     } else if (c.to) {
-        navigateTo(c.to)
+        if (!fromCode.value || !toCode.value || fromCode.value === toCode.value) {
+            flightError.value = 'Pick two different airports.'
+            return
+        }
+        flightError.value = ''
+        navigateTo({ path: c.to, query: { from: fromCode.value, to: toCode.value } })
     }
 }
 
@@ -90,11 +103,17 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                 <label class="mb-1 block text-label-m">{{ c.labels[0] }}</label>
                 <div :class="field">
                     <Icon :name="c.icon" size="22" class="shrink-0 text-gray-500" />
-                    <input v-model="first" type="text" :list="type === 'hotel' ? 'city-options' : undefined"
-                        class="w-full outline-none" />
-                    <datalist v-if="type === 'hotel'" id="city-options">
-                        <option v-for="ci in cities" :key="ci" :value="ci" />
-                    </datalist>
+                    <template v-if="type === 'flight'">
+                        <AirportInput v-model="fromCode" label="From airport" placeholder="From" />
+                        <Icon name="icon-park-outline:right" size="16" class="shrink-0 text-primary-400" />
+                        <AirportInput v-model="toCode" label="To airport" placeholder="To" />
+                    </template>
+                    <template v-else>
+                        <input v-model="first" type="text" list="city-options" class="w-full outline-none" />
+                        <datalist id="city-options">
+                            <option v-for="ci in cities" :key="ci" :value="ci" />
+                        </datalist>
+                    </template>
                 </div>
             </div>
 
@@ -143,5 +162,6 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                 {{ c.button }}
             </button>
         </form>
+        <p v-if="flightError" class="mt-2 text-body-xs text-error-light">{{ flightError }}</p>
     </section>
 </template>

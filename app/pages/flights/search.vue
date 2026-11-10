@@ -1,7 +1,34 @@
 <script setup lang="ts">
-import { filterGroups, airlines, info } from '~/data/flights'
+import { filterGroups, airlines, info as baseInfo } from '~/data/flights'
+import { useAirportsStore } from '~/stores/airports'
 
 useHead({ title: 'Flight Search Result' })
+
+// Route comes from the search form (?from=ARN&to=IST); airport names from LiteAPI
+const route = useRoute()
+const airports = useAirportsStore()
+useLazyAsyncData('airports', async () => {
+    await airports.fetchAirports()
+    return true
+}, { server: false })
+
+const asCode = (v: unknown, fallback: string) =>
+    typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : fallback
+
+// flight times, price and stops are still sample data (LiteAPI has no flights)
+const info = computed(() => {
+    const fromCode = asCode(route.query.from, 'ARN')
+    const toCode = asCode(route.query.to, 'IST')
+    const from = airports.find(fromCode)
+    const to = airports.find(toCode)
+    return {
+        ...baseInfo,
+        from: from?.city || from?.name || fromCode,
+        to: to?.city || to?.name || toCode,
+        fromAirport: [fromCode, from?.name].filter(Boolean).join(' '),
+        toAirport: [toCode, to?.name].filter(Boolean).join(' '),
+    }
+})
 
 const dep = reactive({ min: 12 * 60, max: 16 * 60 + 45 })
 const dur = reactive({ min: 7, max: 12 })
