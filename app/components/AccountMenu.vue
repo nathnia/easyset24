@@ -7,10 +7,15 @@ const root = ref<HTMLElement | null>(null)
 
 const items = [
     { label: 'My Account', to: '/profile', icon: 'icon-park-outline:user' },
+    { label: 'My Bookings', to: '/profile/bookings', icon: 'icon-park-outline:list-checkbox' },
     { label: 'Payments', to: '/payment', icon: 'icon-park-outline:bank-card' },
     { label: 'Settings', to: '/setting', icon: 'icon-park-outline:setting-two' },
     { label: 'Support', to: '/customer-service', icon: 'icon-park-outline:headset-one' },
 ]
+
+// '/profile' must not stay highlighted on '/profile/bookings'
+const isActive = (to: string) =>
+    to === '/profile' ? route.path === '/profile' : route.path.startsWith(to)
 
 function onDocClick(e: MouseEvent) {
     if (root.value && !root.value.contains(e.target as Node)) open.value = false
@@ -48,7 +53,7 @@ function onSignOut() {
             <nav class="mt-4 flex flex-col">
                 <NuxtLink v-for="item in items" :key="item.label" :to="item.to" role="menuitem"
                     :class="['flex items-center gap-3 border-b px-2 py-2.5 text-body-xs',
-                        route.path.startsWith(item.to)
+                        isActive(item.to)
                             ? 'rounded-sm border-transparent bg-primary-500 text-white'
                             : 'border-gray-300 hover:rounded-sm hover:border-transparent hover:bg-primary-500 hover:text-white']">
                     <Icon :name="item.icon" size="18" class="shrink-0" />

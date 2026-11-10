@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useHotelsStore } from '~/stores/hotels'
-import { bookingKey, cancelText, checkoutKey, formatDate, nightsBetween, toBooking } from '~/utils/booking'
+import { bookingKey, cancelText, checkoutKey, formatDate, nightsBetween, rememberBooking, toBooking } from '~/utils/booking'
 import type { Booking } from '~/utils/booking'
 import { formatPrice } from '~/utils/liteapi'
 
@@ -8,6 +8,7 @@ useHead({ title: 'Hotel Reservation' })
 
 const route = useRoute()
 const store = useHotelsStore()
+const { user } = useAuth()
 
 const pid = String(route.query.pid ?? '')
 const tid = String(route.query.tid ?? '')
@@ -65,6 +66,7 @@ async function run() {
             sessionStorage.setItem(bookingKey(pid), JSON.stringify(b))
             sessionStorage.removeItem(checkoutKey(pid))
         }
+        if (booking.value) rememberBooking(user.value?.email ?? '', booking.value.bookingId)
         status.value = 'done'
         if (booking.value?.hotelId && store.detail?.id !== booking.value.hotelId) store.fetchHotel(booking.value.hotelId)
     } catch (e: any) {

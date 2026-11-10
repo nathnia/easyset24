@@ -8,13 +8,15 @@ const user = {
 
 const menus = [
     { label: 'Profile', icon: 'icon-park-outline:user', to: '/profile' },
+    { label: 'My Bookings', icon: 'icon-park-outline:list-checkbox', to: '/profile/bookings' },
     { label: 'Preferences', icon: 'icon-park-outline:list-checkbox', to: '/preferences' },
     { label: 'Payment', icon: 'icon-park-outline:wallet', to: '/payment' },
     { label: 'Help', icon: 'icon-park-outline:help', to: '/help' },
     { label: 'Setting', icon: 'icon-park-outline:setting', to: '/setting' },
 ]
 
-const isActive = (to: string) => route.path.startsWith(to)
+const isActive = (to: string) =>
+    to === '/profile' ? route.path === '/profile' : route.path.startsWith(to)
 </script>
 
 <template>

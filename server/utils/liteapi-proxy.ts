@@ -34,6 +34,7 @@ export async function liteapi(
     cache?: boolean;
     body?: Record<string, unknown>;
     base?: string;
+    method?: "GET" | "POST" | "PUT";
   } = {},
 ) {
   const { liteapiKey } = useRuntimeConfig(event);
@@ -46,7 +47,7 @@ export async function liteapi(
 
   try {
     const data = await $fetch(`${options.base ?? BASE_URL}${path}`, {
-      method: options.body ? "POST" : "GET",
+      method: options.method ?? (options.body ? "POST" : "GET"),
       headers: { "X-API-Key": liteapiKey, accept: "application/json" },
       query,
       body: options.body,

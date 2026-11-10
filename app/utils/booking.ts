@@ -97,3 +97,33 @@ export function toBooking(res: any) {
   };
 }
 export type Booking = ReturnType<typeof toBooking>;
+
+// Booking ids are remembered per user in this browser (mock project: no database).
+const listKey = (email: string) => `easyset_bookings_${email.toLowerCase()}`;
+
+export function getRememberedBookings(email: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(listKey(email)) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberBooking(email: string, bookingId: string) {
+  if (!email || !bookingId) return;
+  try {
+    const ids = getRememberedBookings(email).filter((x) => x !== bookingId);
+    localStorage.setItem(listKey(email), JSON.stringify([bookingId, ...ids]));
+  } catch {
+    /* storage blocked: the booking just won't show in the list */
+  }
+}
+
+// Extra fields only present on a cancelled booking (names guessed, all optional)
+export function toCancelInfo(res: any) {
+  const d = res?.data ?? {};
+  const fee = num(d.cancellation_fee ?? d.cancellationFee);
+  const refund = num(d.refund_amount ?? d.refundAmount);
+  return { fee, refund };
+}
