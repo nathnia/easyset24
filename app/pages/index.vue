@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLocationsStore } from '~/stores/locations'
+
 const heroImage = 'https://images.unsplash.com/photo-1475503572774-15a45e5d60b9?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D'
 
 const tint = (r: number, g: number, b: number) => `rgb(${r}, ${g}, ${b})`
@@ -25,6 +27,33 @@ onBeforeUnmount(() => {
     if (heroTimer) clearInterval(heroTimer)
 })
 
+// ---- hero search: same hotel search as the /hotels form (city + dates)
+const locations = useLocationsStore()
+const { cities: cityOptions } = storeToRefs(locations)
+useLazyAsyncData('home-cities', async () => {
+    await locations.fetchCities('ID')
+    return true
+}, { server: false })
+
+const destination = ref('')
+const checkin = ref('')
+const checkout = ref('')
+const today = new Date().toISOString().slice(0, 10)
+
+// the date boxes look like text boxes until you click them
+const toDate = (e: Event) => { (e.target as HTMLInputElement).type = 'date' }
+const toText = (e: Event) => {
+    const el = e.target as HTMLInputElement
+    if (!el.value) el.type = 'text'
+}
+
+function searchHotels() {
+    const query: Record<string, string> = { cityName: destination.value.trim() }
+    if (checkin.value) query.checkin = checkin.value
+    if (checkout.value) query.checkout = checkout.value
+    navigateTo({ path: '/hotels/search', query })
+}
+
 const filters = ['All', 'Hotels', 'Flights', 'Multi']
 const selectedFilter = ref('All')
 const offerRows = [
@@ -47,20 +76,25 @@ const offerRows = [
 ]
 
 const unsplash = (id: string) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=600&q=80`
+// name = shown on the card, search/country = what the hotel search uses
 const cities = [
-    { name: 'Berlin', img: unsplash('1520250497591-112f2f40a3f4') },
-    { name: 'Paris', img: unsplash('1566073771259-6a8506099945') },
-    { name: 'Madrid', img: unsplash('1584132967334-10e028bd69f7') },
-    { name: 'Barcelona', img: unsplash('1540541338287-41700207dee6') },
-    { name: 'Rom', img: unsplash('1549294413-26f195200c16') },
-    { name: 'Milan', img: unsplash('1445019980597-93fa8acb246c') },
-    { name: 'Istanbul', img: unsplash('1629140727571-9b5c6f6267b4') },
-    { name: 'Dubai', img: unsplash('1542314831-068cd1dbfeeb') },
-    { name: 'Amesterdam', img: unsplash('1582719508461-905c673771fd') },
-    { name: 'New York', img: unsplash('1551918120-9739cb430c6d') },
-    { name: 'Marollca', img: unsplash('1623718649591-311775a30c43') },
-    { name: 'Teneriffa', img: unsplash('1610641818989-c2051b5e2cfd') },
+    { name: 'Berlin', search: 'Berlin', country: 'DE', img: unsplash('1520250497591-112f2f40a3f4') },
+    { name: 'Paris', search: 'Paris', country: 'FR', img: unsplash('1566073771259-6a8506099945') },
+    { name: 'Madrid', search: 'Madrid', country: 'ES', img: unsplash('1584132967334-10e028bd69f7') },
+    { name: 'Barcelona', search: 'Barcelona', country: 'ES', img: unsplash('1540541338287-41700207dee6') },
+    { name: 'Rome', search: 'Rome', country: 'IT', img: unsplash('1549294413-26f195200c16') },
+    { name: 'Milan', search: 'Milan', country: 'IT', img: unsplash('1445019980597-93fa8acb246c') },
+    { name: 'Istanbul', search: 'Istanbul', country: 'TR', img: unsplash('1629140727571-9b5c6f6267b4') },
+    { name: 'Dubai', search: 'Dubai', country: 'AE', img: unsplash('1542314831-068cd1dbfeeb') },
+    { name: 'Amsterdam', search: 'Amsterdam', country: 'NL', img: unsplash('1582719508461-905c673771fd') },
+    { name: 'New York', search: 'New York', country: 'US', img: unsplash('1551918120-9739cb430c6d') },
+    { name: 'Mallorca', search: 'Palma', country: 'ES', img: unsplash('1623718649591-311775a30c43') },
+    { name: 'Tenerife', search: 'Santa Cruz de Tenerife', country: 'ES', img: unsplash('1610641818989-c2051b5e2cfd') },
 ]
+
+function searchCity(c: { search: string; country: string }) {
+    navigateTo({ path: '/hotels/search', query: { cityName: c.search, countryCode: c.country } })
+}
 
 const categories = [
     { name: 'Flight', img: unsplash('1500835556837-99ac94a94552') },
@@ -95,20 +129,27 @@ const inspirationImage = 'https://substackcdn.com/image/fetch/$s_!N2rG!,w_1456,c
                     </h1>
                 </div>
 
-                <form class="flex flex-col overflow-hidden rounded-sm border border-gray-300 bg-white md:flex-row">
+                <form class="flex flex-col overflow-hidden rounded-sm border border-gray-300 bg-white md:flex-row"
+                    @submit.prevent="searchHotels">
                     <label
                         class="flex flex-[1.3] items-center gap-6 border-b border-gray-300 px-4 py-3 md:border-b-0 md:border-r">
                         <Icon name="icon-park-outline:building-one" size="24" class="shrink-0 text-primary-400" />
-                        <input type="text" placeholder="Where Are You Going To?"
+                        <input v-model="destination" type="text" list="home-city-options" required
+                            placeholder="Where Are You Going To?"
                             class="w-full text-caption-s outline-none placeholder:text-black" />
+                        <datalist id="home-city-options">
+                            <option v-for="ci in cityOptions" :key="ci" :value="ci" />
+                        </datalist>
                     </label>
                     <label
                         class="flex flex-1 items-center gap-6 border-b border-gray-300 px-4 py-3 md:border-b-0 md:border-r">
                         <Icon name="icon-park-outline:calendar" size="24" class="shrink-0 text-primary-400" />
-                        <input type="text" placeholder="Check In Date"
-                            class="w-1/2 text-caption-s outline-none placeholder:text-black" />
-                        <input type="text" placeholder="Check Out Date"
-                            class="w-1/2 text-caption-s outline-none placeholder:text-black" />
+                        <input v-model="checkin" type="text" placeholder="Check In Date" :min="today"
+                            class="w-1/2 text-caption-s outline-none placeholder:text-black" @focus="toDate"
+                            @blur="toText" />
+                        <input v-model="checkout" type="text" placeholder="Check Out Date" :min="checkin || today"
+                            class="w-1/2 text-caption-s outline-none placeholder:text-black" @focus="toDate"
+                            @blur="toText" />
                     </label>
                     <label class="flex flex-1 items-center gap-4 border-b border-gray-300 px-4 py-3 md:border-b-0">
                         <Icon name="icon-park-outline:people-plus" size="24" class="shrink-0 text-primary-400" />
@@ -157,7 +198,7 @@ const inspirationImage = 'https://substackcdn.com/image/fetch/$s_!N2rG!,w_1456,c
 
             <div class="page-grid mt-4">
                 <StayCard v-for="c in cities" :key="c.name" :city="c.name" :image="c.img"
-                    class="col-span-2 xl:col-span-3" />
+                    class="col-span-2 xl:col-span-3" @click="searchCity(c)" />
             </div>
         </section>
 
