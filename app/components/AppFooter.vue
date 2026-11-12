@@ -1,4 +1,6 @@
 <script setup lang="ts">
+defineProps<{ compact?: boolean }>()
+
 type FooterLink = { label: string, to: string }
 type FooterColumn = { title: string, to?: string, links: FooterLink[] }
 
@@ -43,7 +45,7 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
 
 <template>
     <footer class="bg-background">
-        <div class="border-b border-gray-200">
+        <div v-if="!compact" class="border-b border-gray-200">
             <div class="page-container flex flex-col justify-between gap-6 py-10 md:flex-row">
                 <div>
                     <h2 class="text-h6 text-primary-500">Go Further With The EasySet24 App</h2>
@@ -81,47 +83,57 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
             </div>
         </div>
 
-        <div class="page-container py-10">
+        <div class="page-container" :class="compact ? 'py-6' : 'py-10'">
             <div class="grid grid-cols-2 gap-8 md:flex md:justify-between">
                 <div v-for="col in columns" :key="col.title">
-                    <NuxtLink v-if="col.to" :to="col.to" class="text-label-m hover:text-primary-500">
+                    <NuxtLink v-if="col.to" :to="col.to"
+                        :class="[compact ? 'text-caption-s' : 'text-label-m', 'hover:text-primary-500']">
                         {{ col.title }}
                     </NuxtLink>
-                    <h3 v-else class="text-label-m">{{ col.title }}</h3>
-                    <ul class="mt-4 space-y-4">
+                    <h3 v-else :class="compact ? 'text-caption-s' : 'text-label-m'">{{ col.title }}</h3>
+                    <ul :class="compact ? 'mt-2 space-y-2' : 'mt-4 space-y-4'">
                         <li v-for="l in col.links" :key="l.label">
-                            <NuxtLink :to="l.to" class="text-body-s text-gray-500 hover:text-primary-500">{{ l.label }}
+                            <NuxtLink :to="l.to"
+                                :class="[compact ? 'text-subtitle-xs' : 'text-body-s', 'text-gray-500 hover:text-primary-500']">
+                                {{ l.label }}
                             </NuxtLink>
                         </li>
                     </ul>
                 </div>
             </div>
 
-            <div class="mt-12 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+            <div
+                :class="compact ? 'mt-6 flex flex-col gap-6 md:flex-row md:items-end md:justify-between' : 'mt-12 flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between'">
                 <div class="flex gap-3">
                     <div v-for="p in payments" :key="p"
-                        class="flex h-10 w-18 items-center justify-center rounded-md border border-gray-300 bg-white">
-                        <Icon :name="p" size="30" />
+                        :class="['flex items-center justify-center rounded-md border border-gray-300 bg-white', compact ? 'h-8 w-15' : 'h-10 w-18']">
+                        <Icon :name="p" :size="compact ? '24' : '30'" />
                     </div>
                 </div>
 
-                <div class="flex gap-6 text-primary-500">
+                <div :class="['flex text-primary-500', compact ? 'gap-4' : 'gap-6']">
                     <a v-for="s in socials" :key="s" href="#" :aria-label="s">
-                        <Icon :name="`simple-icons:${s}`" size="20" />
+                        <Icon :name="`simple-icons:${s}`" :size="compact ? '16' : '20'" />
                     </a>
                 </div>
 
                 <form>
-                    <label for="newsletter" class="mb-1 block text-caption-s">Email</label>
+                    <label for="newsletter"
+                        :class="['mb-1 block', compact ? 'text-body-xxs' : 'text-caption-s']">Email</label>
                     <div class="flex">
                         <div
-                            class="flex w-full items-center gap-3 rounded-l-sm border border-gray-300 bg-white px-3 sm:w-72">
-                            <Icon name="icon-park-outline:mail" size="18" class="text-gray-400" />
+                            :class="['flex w-full items-center rounded-l-sm border border-gray-300 bg-white',
+                                compact ? 'gap-2 px-2 sm:w-52' : 'gap-3 px-3 sm:w-72']">
+                            <Icon name="icon-park-outline:mail" :size="compact ? '14' : '18'" class="text-gray-400" />
                             <input id="newsletter" type="email" placeholder="Enter Your Email"
-                                class="w-full py-2.5 text-body-xs outline-none placeholder:text-gray-400" />
+                                :class="['w-full outline-none placeholder:text-gray-400',
+                                    compact ? 'py-1.5 text-body-xxs' : 'py-2.5 text-body-xs']" />
                         </div>
                         <button
-                            class="rounded-r-sm bg-primary-500 px-5 text-button-l text-white hover:bg-primary-600">Subscribe</button>
+                            :class="['rounded-r-sm bg-primary-500 text-white hover:bg-primary-600',
+                                compact ? 'px-3 py-1 text-button-s' : 'px-5 text-button-l']">
+                            Subscribe
+                        </button>
                     </div>
                 </form>
             </div>
@@ -129,14 +141,17 @@ const qr = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&da
 
         <div class="bg-gray-300">
             <div
-                class="page-container flex flex-col gap-3 py-4 text-body-xs md:flex-row md:items-center md:justify-between">
+                class="page-container flex flex-col gap-3 text-body-xs md:flex-row md:items-center md:justify-between"
+                :class="compact ? 'py-2 text-body-xxs' : 'py-4'">
                 <span class="flex items-center gap-2">
                     <Icon name="icon-park-outline:copyright" size="14" class="text-primary-500" /> Copyright EasySet24
                 </span>
                 <span class="flex items-center gap-2">
                     <Icon name="icon-park-outline:mail" size="14" class="text-primary-500" /> Easyset24@Gmail.Com
                 </span>
-                <span class="text-label-m">"EasySet24: Seamless Journeys, Unrivalled Travel Wisdom!"</span>
+                <span :class="compact ? 'text-body-xxs' : 'text-label-m'">
+                    "EasySet24: Seamless Journeys, Unrivalled Travel Wisdom!"
+                </span>
                 <span class="flex items-center gap-2">
                     <Icon name="icon-park-outline:local-two" size="14" class="text-primary-500" /> 123 Oxford
                     Street,London

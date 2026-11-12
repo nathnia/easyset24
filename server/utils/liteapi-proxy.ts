@@ -60,6 +60,7 @@ export async function liteapi(
       statusCode: e?.statusCode || 502,
       statusMessage:
         e?.data?.error?.message || e?.statusMessage || "LiteAPI request failed",
+      data: { description: e?.data?.error?.description || "" },
     });
   }
 }

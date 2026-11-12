@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const logo = '/images/logo.svg'
+const route = useRoute()
 
 const scrolled = ref(false)
 const onScroll = () => { scrolled.value = window.scrollY > 4 }
@@ -31,6 +32,6 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
             <slot />
         </main>
 
-        <AppFooter />
+        <AppFooter :compact="route.path === '/flights/payment'" />
     </div>
 </template>
