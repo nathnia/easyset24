@@ -1,449 +1,510 @@
 <script setup lang="ts">
+import { useFlightsStore } from '~/stores/flights'
+import { formatDate, formatFlightPrice, formatMinutes } from '~/utils/flights'
+import type { DetailLeg } from '~/utils/flights'
+import { flightImage, onFlightImgError } from '~/utils/flightImage'
+import { toFlightPrebook } from '~/utils/flightBooking'
+import type { FlightPrebook } from '~/utils/flightBooking'
+
 useHead({ title: 'Payment Details' })
+definePageMeta({ layout: 'checkout' })
 
-const photo = (n: number) => `https://picsum.photos/seed/easyset-pay-${n}/200/160`
+const SDK_URL = 'https://payment-wrapper.liteapi.travel/dist/liteAPIPayment.js?v=a1'
 
-const location = ['0 m to City Centre', '24 km to Landvetter Airport', '2,5 km to Liseberg Amusment Park', '0 m to Gothenburg Central Station']
-const facilities = [
-    { icon: 'icon-park-outline:cup', label: 'Breakfast Included' },
-    { icon: 'icon-park-outline:wifi', label: 'Free Wi-Fi' },
-    { icon: 'icon-park-outline:parking', label: 'Free Parking' },
-    { icon: 'icon-park-outline:dog', label: 'Pets Are Welcome' },
-    { icon: 'icon-park-outline:washing-machine', label: 'Free Laundry Service' },
-    { icon: 'icon-park-outline:close-one', label: 'No Smoking' },
-    { icon: 'icon-park-outline:run-left', label: 'Free Entrance Exercise Centre' },
-]
-const stay = ['You Will Stay 4 Nights', 'You Selected 2 Rooms For :', '2 Adults', '3 Children (12 ,7 And 5 Years Old)', '0 Infant']
-const roomTags = [
-    { icon: 'icon-park-outline:ruler', label: '18 M²' },
-    { icon: 'icon-park-outline:local', label: 'City Center' },
-    { icon: 'icon-park-outline:tree', label: 'Next To Forest' },
-    { icon: 'icon-park-outline:shower-head', label: 'En-Suite Bath Room' },
-    { icon: 'icon-park-outline:tv', label: 'Flat-Screen TV' },
+const route = useRoute()
+const config = useRuntimeConfig()
+const flightStore = useFlightsStore()
+const { user } = useAuth()
+const { detail, detailLoading, detailError } = storeToRefs(flightStore)
+
+// The detail page links here with ?offer=<offerId>&adults=<n>&children=<n>
+const offerId = computed(() => (typeof route.query.offer === 'string' ? route.query.offer : ''))
+const count = (v: unknown, min: number) => Math.min(9, Math.max(min, Number(typeof v === 'string' ? v : '') || min))
+const adults = count(route.query.adults, 1)
+const children = count(route.query.children, 0)
+const travellers = [
+    ...Array.from({ length: adults }, (_, i) => ({ type: 0 as const, label: `Adult ${i + 1}` })),
+    ...Array.from({ length: children }, (_, i) => ({ type: 1 as const, label: `Child ${i + 1}` })),
 ]
 
-const originalPrice = 960
-const discount = 100
-const total = originalPrice - discount
-
-const bookingFor = ref('other')
-const payLater = ref(true)
-const forWork = ref(true)
+const prebook = ref<FlightPrebook | null>(null)
+const submitting = ref(false)
+const payError = ref('')
+const sdkReady = ref(false)
+let payment: any = null
 
 // shared classes
 const field = 'w-full rounded-sm border border-gray-300 bg-white px-3 py-2 text-body-xs outline-none placeholder:text-gray-400 focus:border-primary-500'
-const card = 'rounded-md bg-white p-4 md:p-6'
-const check = 'h-4 w-4 accent-primary-500'
 
-const nameFields = [
-    { key: 'first', label: 'First name', required: true },
-    { key: 'middle', label: 'Middle name', required: false },
-    { key: 'last', label: 'Last name', required: true },
-] as const
-const tagRows = [roomTags.slice(0, 3), roomTags.slice(3)]
+const forWork = ref(true)
+const showTerms = ref(false)
 
-type Key = 'first' | 'middle' | 'last' | 'email' | 'phone' | 'country' | 'cardName' | 'cardNumber' | 'exp' | 'cvc'
+// ---- validation (dates are checked against the age on the last flight)
+const DATE = /^\d{4}-\d{2}-\d{2}$/
+const travelDate = () => detail.value?.back?.date || detail.value?.out.date || new Date().toISOString().slice(0, 10)
+const ageOn = (birth: string, on: string) => {
+    const [by, bm, bd] = birth.split('-').map(Number) as [number, number, number]
+    const [y, m, d] = on.split('-').map(Number) as [number, number, number]
+    return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0)
+}
+const birthRule = (type: 0 | 1) => (v: string) => {
+    if (!DATE.test(v) || Number.isNaN(Date.parse(v))) return 'Date of birth is required'
+    const age = ageOn(v, travelDate())
+    if (age < 0) return 'Date of birth is after the travel date'
+    if (type === 0 && age < 12) return 'Adults must be 12 or older on the travel date'
+    if (type === 1 && (age < 2 || age > 11)) return 'Children must be 2 to 11 on the travel date'
+    return ''
+}
 
-const { form, errors, validateField, validateAll, onInput, formatCard, formatExp, formatCvc, scrollToFirstError } =
-    usePaymentForm<Key>({
-        initial: {
-            first: '', middle: '', last: '', email: '', phone: '', country: '',
-            cardName: '', cardNumber: '', exp: '', cvc: '',
-        },
-        rules: {
-            first: required('First name is required'),
-            last: required('Last name is required'),
-            email: validEmail,
-            phone: validPhone,
-            country: required('Country is required'),
-            cardName: required('Name on the card is required'),
-            cardNumber: validCard,
-            exp: validExp,
-            cvc: validCvc,
-        },
-        cardKey: 'cardNumber',
+const k = (i: number, f: string) => `p${i}_${f}`
+const [firstGuess = '', ...restGuess] = (user.value?.name ?? '').trim().split(/\s+/)
+const initial: Record<string, string> = {
+    first: firstGuess, middle: '', last: restGuess.join(' '), email: user.value?.email ?? '', code: '', phone: '',
+}
+const rules: Record<string, (v: string) => string> = {
+    first: required('First name is required'),
+    last: required('Last name is required'),
+    email: validEmail,
+    code: (v) => (/^\d{1,4}$/.test(v.trim()) ? '' : 'Code'),
+    phone: validPhone,
+}
+travellers.forEach((t, i) => {
+    for (const f of ['first', 'last', 'birth', 'gender', 'nat']) initial[k(i, f)] = ''
+    const own = (rule: (v: string) => string) => (v: string) => (i === 0 ? '' : rule(v))
+    rules[k(i, 'first')] = own(required('First name is required'))
+    rules[k(i, 'last')] = own(required('Last name is required'))
+    rules[k(i, 'birth')] = birthRule(t.type)
+    rules[k(i, 'gender')] = required('Select a gender')
+    rules[k(i, 'nat')] = (v) => (/^[A-Za-z]{2}$/.test(v.trim()) ? '' : '2-letter code, e.g. SE')
+})
+
+const { form, errors, validateField, validateAll, onInput, scrollToFirstError } = usePaymentForm<string>({ initial, rules })
+const pf = form as Record<string, any>
+const err = errors as Record<string, any>
+const fieldCls = (key: string) => [field, errors[key] ? 'border-error-light!' : '']
+const phoneError = computed(() => errors.phone || 'Enter the country code')
+const onUpper = (key: string) => {
+    form[key] = form[key]!.toUpperCase().slice(0, 2)
+    onInput(key)
+}
+
+// ---- page state
+// A held reservation can't be edited: reloading starts a clean checkout
+const startOver = () => location.reload()
+const shownPrice = computed(() => prebook.value?.price ?? detail.value?.price ?? 0)
+const shownCurrency = computed(() => prebook.value?.currency ?? detail.value?.currency ?? 'USD')
+const legs = computed(() => [
+    { title: 'Outbound', leg: detail.value?.out ?? null },
+    { title: 'Return', leg: detail.value?.back ?? null },
+].filter((l): l is { title: string; leg: DetailLeg } => !!l.leg))
+
+// ---- left column: photo card + trip summary
+const ORDINALS = ['First', 'Second', 'Third', 'Fourth']
+const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+// "One Stop, 3h Between": the waiting time between two flights of the outbound trip
+const stopHeadline = computed(() => {
+    const segs = detail.value?.out.segments ?? []
+    const waits = segs.slice(1).map((s, i) => (toMin(s.departure) - toMin(segs[i]!.landing) + 1440) % 1440)
+    const n = detail.value?.out.stops ?? 0
+    if (n === 0) return 'Non-stop'
+    const label = n === 1 ? 'One Stop' : `${n} Stops`
+    return waits.length === n ? `${label}, ${waits.map(formatMinutes).join(' & ')} Between` : label
+})
+const mins = (t: string) => (Number(/(\d+)h/.exec(t)?.[1]) || 0) * 60 + (Number(/(\d+)m/.exec(t)?.[1]) || 0)
+const flightTime = computed(() => {
+    const m = (detail.value?.out.segments ?? []).reduce((a, s) => a + mins(s.duration), 0)
+    return m ? `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}h` : ''
+})
+const outFlights = computed(() => (detail.value?.out.segments ?? []).map((s, i) => ({
+    label: `${ORDINALS[i] ?? `Flight ${i + 1}`} Flight No From ${s.fromName || s.fromCode}`,
+    code: s.flightNo,
+    airline: s.airline,
+    logoUrl: s.logoUrl,
+})))
+const photoAirline = computed(() => detail.value?.out.segments[0]?.airline ?? 'Airline')
+const summary = computed(() => legs.value.map(({ title, leg }) => {
+    const f = leg.segments[0]!
+    const t = leg.segments[leg.segments.length - 1]!
+    let text = `${title === 'Outbound' ? 'Your flight' : 'Your return flight'} takes off from ${f.fromName || f.fromCode} (${f.fromCode}) on ${formatDate(leg.date)} at ${f.departure}.`
+    for (const l of leg.layovers) {
+        text += ` You change flights at ${l.name || l.code} (${l.code})${l.changeAirport ? ' and you must change airports' : ''}.`
+    }
+    return `${text} You land at ${t.toName || t.toCode} (${t.toCode}) on ${formatDate(leg.arriveDate)} at ${t.landing}.`
+}))
+
+// ---- right column: price rows (amounts only shown when they add up to the verified total)
+const priceRows = computed(() => {
+    const d = detail.value
+    if (!d) return []
+    const rows = [{ n: adults, label: adults === 1 ? 'Adult' : 'Adults', unit: d.perPassenger.adult }]
+    if (children) rows.push({ n: children, label: children === 1 ? 'Child' : 'Children', unit: d.perPassenger.child })
+    const amounts = rows.map((r) => (r.unit == null ? null : Math.round(r.unit * r.n * 100) / 100))
+    const sum = amounts.reduce<number>((a, b) => a + (b ?? Number.NaN), 0)
+    const match = Number.isFinite(sum) && Math.abs(sum - d.price) < 0.05
+    return rows.map((r, i) => ({ ...r, amount: match ? amounts[i] ?? null : null }))
+})
+
+function loadSdk() {
+    return new Promise<void>((resolve, reject) => {
+        if ((window as any).LiteAPIPayment) return resolve()
+        const s = document.createElement('script')
+        s.src = SDK_URL
+        s.async = true
+        s.onload = () => resolve()
+        s.onerror = () => reject(new Error('Payment form failed to load'))
+        document.head.appendChild(s)
     })
+}
 
-const fieldCls = (key: Key) => [field, errors[key] ? 'border-error-light!' : '']
+onBeforeUnmount(() => {
+    payment = null
+})
 
-async function submit() {
-    if (validateAll()) {
-        await navigateTo('/hotels/reservation')
+// Tailwind resets button styles, so the SDK's own "Pay" button looks like plain text.
+function styleSdkPayButton(root: HTMLElement) {
+    const apply = () => {
+        root.querySelectorAll<HTMLElement>('button, [role="button"]').forEach((el) => {
+            if (el.textContent?.trim().toLowerCase() !== 'pay') return
+            el.style.cssText = 'display:block;width:100%;margin-top:16px;padding:12px;border-radius:4px;'
+                + 'background:var(--color-primary-500,#07689f);color:#fff;font-weight:600;font-size:16px;'
+                + 'text-align:center;cursor:pointer;border:0;'
+        })
+    }
+    apply()
+    new MutationObserver(apply).observe(root, { childList: true, subtree: true })
+}
+
+// Draws the card form ONE time. The card form has its own Pay button.
+let started = false
+async function startCardForm(p: FlightPrebook) {
+    if (started) return
+    started = true
+    try {
+        await loadSdk()
+        const el = document.getElementById('liteapi-payment')
+        if (!el) throw new Error('Payment form failed to load. Refresh the page.')
+        el.innerHTML = ''
+        const returnUrl = `${location.origin}/flights/ticket?pid=${encodeURIComponent(p.prebookId)}&tid=${encodeURIComponent(p.transactionId)}`
+        payment = new (window as any).LiteAPIPayment({
+            publicKey: config.public.liteapiPaymentEnv,
+            secretKey: p.secretKey,
+            returnUrl,
+            targetElement: '#liteapi-payment',
+            appearance: { theme: 'flat' },
+            options: { business: { name: 'EasySet24' } },
+        })
+        await payment.handlePayment()
+        styleSdkPayButton(el)
+        sdkReady.value = true
+    } catch (e: any) {
+        payError.value = e?.message || 'Payment form failed to load. Refresh the page.'
+    }
+}
+
+// Step 1: send passengers + contact, the airline holds the seats and we get the card keys
+async function continueToPayment() {
+    payError.value = ''
+    if (!validateAll()) {
+        await scrollToFirstError()
         return
     }
-    await scrollToFirstError()
+    const passengers = travellers.map((t, i) => {
+        const v = (f: string) => pf[k(i, f)]!.trim()
+        const copy = i === 0
+        return {
+            passengerType: t.type,
+            firstName: copy ? form.first!.trim() : v('first'),
+            middleName: copy ? form.middle!.trim() : '',
+            lastName: copy ? form.last!.trim() : v('last'),
+            birthday: v('birth'),
+            gender: v('gender'),
+            nationality: v('nat'),
+        }
+    })
+    submitting.value = true
+    try {
+        const res = await $fetch('/api/flight-prebook', {
+            method: 'POST',
+            body: {
+                offerId: offerId.value,
+                contact: {
+                    firstName: form.first!.trim(), middleName: form.middle!.trim(), lastName: form.last!.trim(),
+                    email: form.email!.trim(), phoneCountryCode: form.code!.trim(), phoneNumber: form.phone!.trim(),
+                },
+                passengers,
+            },
+        })
+        const p = toFlightPrebook(res)
+        if (!p.prebookId || !p.transactionId || !p.secretKey) throw new Error('Checkout could not be started.')
+        prebook.value = p
+        await nextTick()
+        // the card form appears below the passenger fields: bring it into view
+        document.getElementById('liteapi-payment')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        await startCardForm(p)
+    } catch (e: any) {
+        payError.value = e?.data?.data?.description || e?.data?.statusMessage || e?.statusMessage || e?.message
+            || 'Could not start the checkout. Please try again.'
+    } finally {
+        submitting.value = false
+    }
 }
+
+onMounted(async () => {
+    // Always re-verify: it fills the page after a refresh and gives the latest price
+    if (offerId.value) await flightStore.verify(offerId.value)
+})
 </script>
 
 <template>
-    <div class="page-container grid gap-6 pb-12 lg:grid-cols-[5fr_6fr]">
-        <div class="flex flex-col justify-between gap-6">
-            <section :class="card" class="flex gap-4">
-                <div class="flex w-28 shrink-0 flex-col gap-2 sm:w-32">
-                    <img v-for="n in 3" :key="n" :src="photo(n)" alt="" class="h-24 w-full rounded-sm object-cover" />
-                    <div class="relative h-24 overflow-hidden rounded-sm">
-                        <img :src="photo(4)" alt="" class="h-full w-full object-cover" />
-                        <span class="absolute inset-0 flex items-end bg-black/50 p-1.5 text-[10px] text-white">See More
-                            Photos</span>
-                    </div>
-                </div>
-
-                <div class="min-w-0 flex-1">
-                    <h1 class="text-h5">First Hotel G</h1>
-                    <p class="text-body-xxs">Modern Hotel at Gothenburg Central Station</p>
-                    <p class="mt-2 flex items-center gap-1 text-body-xs">
-                        More Than 4,325 Review
-                        <Icon name="icon-park-outline:down" size="12" />
-                        <span
-                            class="ml-auto rounded-sm border border-primary-500 px-1 text-button-s text-primary-500">9,2</span>
-                    </p>
-                    <div class="mt-1 h-1 rounded-full bg-gray-300">
-                        <div class="h-full w-[92%] rounded-full bg-primary-500" />
-                    </div>
-
-                    <h2 class="mt-4 flex items-center gap-1 text-label-m">
-                        <Icon name="icon-park-outline:local" size="16" class="text-primary-500" />
-                        Location Information
-                    </h2>
-                    <ul class="mt-1 list-disc space-y-1 pl-6 text-body-xxs">
-                        <li v-for="l in location" :key="l">{{ l }}</li>
-                    </ul>
-
-                    <ul class="mt-4 space-y-3 text-body-xs text-gray-500">
-                        <li v-for="f in facilities" :key="f.label" class="flex items-center gap-3">
-                            <Icon :name="f.icon" size="16" />{{ f.label }}
-                        </li>
-                    </ul>
-                </div>
-            </section>
-
-            <section :class="card">
-                <h2 class="text-h6">Your Booking Deteiels</h2>
-                <div class="mt-4 grid grid-cols-2 gap-3">
-                    <div class="rounded-l-sm border-l border-primary-400 py-2 pl-3">
-                        <p class="text-label-m">Check - In</p>
-                        <p class="mt-2 text-body-s">2 August 2023</p>
-                    </div>
-                    <div class="rounded-l-sm border-l border-primary-400 py-2 pl-3">
-                        <p class="text-label-m">Check -Out</p>
-                        <p class="mt-2 text-body-s">6 August 2023</p>
-                    </div>
-                </div>
-                <ul class="mt-4 list-disc space-y-1 pl-5 text-body-xs">
-                    <li v-for="s in stay" :key="s">{{ s }}</li>
-                </ul>
-            </section>
-
-            <section :class="card">
-                <h2 class="text-body-m"><b>The Room :</b> Superior Twin Room</h2>
-                <p class="mt-3 flex items-center gap-2 text-body-s">
-                    <Icon name="icon-park-outline:plus" size="14" />
-                    <b class="text-label-m">Guest Number</b> 2 Adult
-                </p>
-                <p class="mt-2 flex items-center gap-2 text-body-xs">
-                    <Icon name="icon-park-outline:handwashing" size="16" />
-                    Cleanliness Rooms Rate
-                    <span class="rounded-sm border border-primary-500 px-1 text-button-s text-primary-500">8,9</span>
-                </p>
-                <div class="mt-4 space-y-3">
-                    <div v-for="(row, i) in tagRows" :key="i" class="grid gap-3"
-                        :class="i === 0 ? 'grid-cols-3' : 'grid-cols-2'">
-                        <span v-for="t in row" :key="t.label"
-                            class="flex items-center justify-center gap-2 rounded-sm border border-success-dark bg-success-light px-2 py-2 text-center text-body-s">
-                            <Icon :name="t.icon" size="18" class="shrink-0" />{{ t.label }}
-                        </span>
-                    </div>
-                </div>
-            </section>
-
-            <section :class="card">
-                <h2 class="text-h3">Payment Information</h2>
-
-                <h3 class="mt-6 border-b border-gray-300 pb-2 text-h5">Your Price Summary</h3>
-                <p class="flex items-baseline justify-between border-b border-gray-300 py-3 text-body-s">
-                    <b class="text-label-m">Original Price</b>
-                    <span><b class="text-label-m">${{ originalPrice }}</b> <b class="text-label-s text-gray-500">4
-                            Nights</b></span>
-                </p>
-                <p class="flex items-baseline justify-between border-b border-gray-300 py-3 text-body-xs">
-                    EasySet24 Loyalty Discount 4 %
-                    <span><span class="text-error-light">${{ discount }}</span> <span
-                            class="text-gray-500">Discount</span></span>
-                </p>
-                <p class="mt-3 flex items-center justify-between border-b border-gray-300 px-3 py-3 text-label-m">
-                    Total Amount For Payment
-                    <span class="text-h4 text-success-dark">${{ total }}</span>
-                </p>
-
-                <h3 class="mt-8 text-h5">Cancellation Policy</h3>
-                <p class="mt-2 flex items-center gap-2 text-label-m">
-                    <Icon name="icon-park-outline:check" size="16" />Free Cancellation
-                </p>
-                <p class="mt-1 text-body-xs">Cancel /Rebook No Later Than 24 Hours Before, Otherwise You Pay 80% Of The
-                    Cost.</p>
-
-                <div class="mt-8 flex items-center justify-between">
-                    <h3 class="text-h5">Pay Part Now, Part Later</h3>
-                    <input type="radio" :checked="payLater" class="h-5 w-5 accent-primary-500"
-                        @click="payLater = !payLater" />
-                </div>
-                <p class="mt-2 text-body-xs">
-                    Pay $ 200 Now, And The Rest ($6,60) Will Be Automatically Charged To The Same Payment Method On
-                    August 27, 2023. No Extra Fees.
-                </p>
-            </section>
-
-            <section :class="card">
-                <h2 class="text-h5">Payment Methods</h2>
-                <div class="mt-3 flex items-center justify-between">
-                    <label class="flex items-center gap-3 text-label-m">
-                        Payment Method
-                        <span
-                            class="flex w-28 items-center justify-between rounded-sm border border-gray-300 px-2 py-1.5">
-                            <Icon name="logos:paypal" size="16" />
-                            <Icon name="icon-park-outline:down" size="12" class="text-gray-400" />
-                        </span>
-                    </label>
-                    <label class="flex items-center gap-3 text-label-m">
-                        Booking For Work
-                        <input type="radio" :checked="forWork" class="h-5 w-5 accent-primary-500"
-                            @click="forWork = !forWork" />
-                    </label>
-                </div>
-            </section>
+    <div class="page-container pb-12 pt-8 md:pt-10">
+        <p v-if="!offerId" class="py-10 text-body-s">
+            No flight selected.
+            <NuxtLink to="/flights/search" class="text-primary-500 underline">Pick a flight first</NuxtLink>
+        </p>
+        <p v-else-if="detailLoading || (!detail && !detailError)" class="py-10 text-body-s text-gray-500">
+            Preparing your checkout...</p>
+        <div v-else-if="detailError" class="py-10 text-body-s">
+            <p class="text-error-light">{{ detailError }}</p>
+            <NuxtLink to="/flights/search" class="mt-2 inline-block text-primary-500 underline">Back to flights
+            </NuxtLink>
         </div>
 
-        <div class="flex flex-col justify-between gap-6">
-            <section :class="card">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <img src="https://i.pravatar.cc/100?img=47" alt="Anna Carinna"
-                            class="h-12 w-12 rounded-full object-cover" />
-                        <div>
-                            <p class="text-label-m">Anna Carinna</p>
-                            <p class="text-body-xs">Easyset24@Gmail.Com</p>
+        <section v-else-if="detail" class=" bg-white p-4 md:p-5 xl:p-6">
+            <div class="grid items-stretch gap-x-10 gap-y-8 lg:grid-cols-2 xl:gap-x-24 2xl:gap-x-28">
+                <!-- Left: what to know + the flight -->
+                <div class="flex h-full min-w-0 flex-col">
+                    <h1 class="text-subtitle-l">Information You Need To Pay Attention .</h1>
+                    <p class="mt-2 text-body-s">Passengers Are Divided According To Age Categories .</p>
+                    <p class="text-body-xxs">Please Check Categories</p>
+
+                    <div class="relative mt-4 aspect-video max-h-48 overflow-hidden rounded-md bg-gray-300">
+                        <img :src="flightImage(photoAirline, 700, 420)" alt="" class="h-full w-full object-cover"
+                            @error="onFlightImgError($event, photoAirline, 700, 420)" />
+                        <div class="absolute inset-0 bg-linear-to-b from-black/40 via-transparent to-black/70" />
+                        <div class="absolute inset-x-4 top-3 flex items-center justify-between gap-3 text-white">
+                            <span class="text-label-m">{{ stopHeadline }}</span>
+                            <span v-if="flightTime" class="text-body-xs">Flight Duration <b class="text-label-m">{{
+                                flightTime }}</b></span>
                         </div>
-                    </div>
-                    <NuxtLink to="#"
-                        class="flex items-center gap-2 rounded-sm border border-primary-500 px-4 py-2 text-button-m text-primary-500 hover:bg-primary-500 hover:text-white">
-                        Check Your Booking History
-                        <Icon name="icon-park-outline:right" size="14" />
-                    </NuxtLink>
-                </div>
-
-                <div class="mt-5 flex flex-wrap items-center gap-x-8 gap-y-2">
-                    <p class="text-label-m">Who Are You Booking For?</p>
-                    <label class="flex items-center gap-2 text-body-xxs">
-                        <input v-model="bookingFor" type="radio" value="me" class="accent-primary-500" />I Am The Main
-                        Guest
-                    </label>
-                    <label class="flex items-center gap-2 text-body-xxs">
-                        <input v-model="bookingFor" type="radio" value="other" class="accent-primary-500" />Booking Is
-                        For Someone Else
-                    </label>
-                </div>
-
-                <h2 class="mt-6 text-h5">Enter Your Information</h2>
-                <p class="mt-2 text-body-xs">Make Sure The Information That You Have Already Written In Yoy Profile Is
-                    Correct.</p>
-                <NuxtLink to="#" class="mt-2 flex items-center justify-end gap-1 text-body-xs text-primary-500">
-                    <Icon name="icon-park-outline:edit" size="14" />Edit Profile
-                </NuxtLink>
-            </section>
-
-            <section :class="card" class="space-y-4">
-                <div>
-                    <p class="mb-2 text-label-m">Full Name</p>
-                    <div class="grid gap-3 sm:grid-cols-3">
-                        <div v-for="n in nameFields" :key="n.key">
-                            <label class="relative block">
-                                <input v-model="form[n.key]" type="text" placeholder=" " :class="fieldCls(n.key)"
-                                    class="peer" @blur="validateField(n.key)" @input="onInput(n.key)" />
-                                <span
-                                    class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body-xs text-gray-400 peer-not-placeholder-shown:hidden">
-                                    {{ n.label }}<span v-if="n.required" class="text-error-light"> *</span>
+                        <div class="absolute inset-x-4 bottom-3 space-y-1 text-white">
+                            <p v-for="(f, i) in outFlights" :key="i"
+                                class="flex items-center justify-between gap-3 text-body-xs">
+                                <span class="min-w-0 truncate">{{ f.label }} <b>{{ f.code }}</b></span>
+                                <span class="flex shrink-0 items-center gap-1">
+                                    <img v-if="f.logoUrl" :src="f.logoUrl" alt=""
+                                        class="h-5 w-5 rounded-full bg-white object-contain" />
+                                    {{ f.airline }}
                                 </span>
-                            </label>
-                            <p v-if="errors[n.key]" data-error class="mt-1 text-body-xxs text-error-light">{{
-                                errors[n.key] }}</p>
+                            </p>
                         </div>
+                    </div>
+
+                    <h2 class="mt-4 text-subtitle-l">Your Trip Summary</h2>
+                    <p v-for="(t, i) in summary" :key="i" class="mt-2 text-body-xs">{{ t }}</p>
+
+                    <div
+                        class="mt-4 flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-gray-300 pt-3 text-body-xs">
+                        <span class="flex items-center gap-1"><b>Very Good</b> 2,259 Reviews
+                            <Icon name="icon-park-outline:down" size="12" />
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <Icon name="icon-park-outline:tree" size="14" class="text-success-dark" />Sustainability
+                            Level
+                            <Icon name="icon-park-outline:down" size="12" />
+                        </span>
                     </div>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2">
-                    <label>
-                        <span class="mb-1 block text-label-m">Email Address</span>
-                        <span class="flex items-center gap-2" :class="fieldCls('email')">
-                            <Icon name="icon-park-outline:mail" size="16" class="text-gray-400" />
-                            <input v-model="form.email" type="email" placeholder="..........."
-                                class="w-full outline-none" @blur="validateField('email')" @input="onInput('email')" />
-                        </span>
-                        <span v-if="errors.email" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.email }}</span>
-                    </label>
-                    <label>
-                        <span class="mb-1 block text-label-m">Phone Number</span>
-                        <span class="flex items-center gap-2" :class="fieldCls('phone')">
-                            <Icon name="circle-flags:se" size="16" />
-                            <input v-model="form.phone" type="tel" placeholder="764378888888"
-                                class="w-full outline-none" @blur="validateField('phone')" @input="onInput('phone')" />
-                        </span>
-                        <span v-if="errors.phone" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.phone }}</span>
-                    </label>
-                </div>
+                <!-- Right: price, passengers, card -->
+                <div class="flex h-full min-w-0 flex-col">
+                    <h2 class="text-subtitle-l">Payment Methods And Information</h2>
 
-                <div>
-                    <p class="text-label-m">If You Need Assistance</p>
-                    <p class="text-body-xxs">Choose An Option Based On Physical Disability Accordingly.</p>
-                    <div class="mt-2 grid gap-3 sm:grid-cols-2">
-                        <label>
-                            <span class="mb-1 block text-caption-s">Chose An Option</span>
-                            <select :class="field">
-                                <option>Not Provided</option>
-                            </select>
+                    <h3 class="mt-4 text-label-m">Price Details</h3>
+                    <ul class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-body-s">
+                        <li v-for="r in priceRows" :key="r.label" class="flex items-center gap-2">
+                            <span v-if="r.amount != null" class="text-success-dark">{{ formatFlightPrice(r.amount,
+                                detail.currency) }}</span>
+                            {{ r.n }} {{ r.label }}
+                        </li>
+                    </ul>
+                    <p class="mt-2 flex items-center justify-between border-y border-gray-300 py-2 text-label-m">
+                        Total ({{ shownCurrency }})
+                        <span class="text-h6 text-success-dark">{{ formatFlightPrice(shownPrice, shownCurrency)
+                        }}</span>
+                    </p>
+                    <p v-if="detail.priceChange" class="mt-2 text-body-xs text-error-light">
+                        The price changed from {{ formatFlightPrice(detail.priceChange.oldPrice, detail.currency) }} to
+                        {{ formatFlightPrice(detail.priceChange.newPrice, detail.currency) }} since the search.
+                    </p>
+
+                    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+                        <label class="flex items-center gap-2 text-label-m">
+                            <input type="radio" :checked="forWork" class="h-4 w-4 accent-primary-500"
+                                @click="forWork = !forWork" />Booking For Work
                         </label>
-                        <label>
-                            <span class="mb-1 block text-caption-s">Region /Country</span>
-                            <span class="relative block">
-                                <select v-model="form.country"
-                                    :class="[fieldCls('country'), form.country ? '' : 'text-transparent']"
-                                    @change="validateField('country')">
-                                    <option value="" disabled class="text-black">Country</option>
-                                    <option value="Sweden" class="text-black">Sweden</option>
-                                </select>
-                                <span v-if="!form.country"
-                                    class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-body-xs text-gray-400">
-                                    Country<span class="text-error-light"> *</span>
-                                </span>
+                        <span class="flex items-center gap-3 text-label-m">
+                            Payment Method
+                            <span
+                                class="flex w-24 items-center justify-between rounded-sm border border-gray-300 px-2 py-1.5">
+                                <Icon name="logos:visa" size="22" />
+                                <Icon name="icon-park-outline:down" size="12" class="text-gray-400" />
                             </span>
-                            <span v-if="errors.country" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                                errors.country }}</span>
-                        </label>
-                    </div>
-                </div>
-            </section>
-
-            <section :class="card" class="space-y-5">
-                <h2 class="text-h5">Add To Your Stay</h2>
-
-                <div>
-                    <label class="flex items-center gap-3 text-label-m">
-                        <input type="checkbox" :class="check" />I Will Need A Flight For My Trip
-                    </label>
-                    <p class="mt-2 flex items-center gap-2 pl-7 text-body-xxs">
-                        <Icon name="icon-park-outline:airplane" size="14" />20% Special Offer If You Book A Flight
-                    </p>
-                    <p class="mt-2 pl-7 text-body-xs">Flexible Flight Options From Stockholm To Turkiye From SLK
-                        766/Round Trip. Fnnish Booking</p>
-                    <p class="mt-1 pl-7 text-body-xs">This Stay To Get Flight Recommendations That Match Your Selected
-                        Dates.</p>
-                </div>
-
-                <div>
-                    <label class="flex items-center gap-3 text-label-m">
-                        <input type="checkbox" :class="check" />Want To Book A Taxi Or Shuttle Ride In Advance?
-                    </label>
-                    <p class="mt-2 flex items-center gap-2 pl-7 text-body-xxs">
-                        <Icon name="icon-park-outline:taxi" size="14" />10% Special Offer If You Rent A Taxi
-                    </p>
-                    <p class="mt-2 pl-7 text-body-xs">Avoid Surprises_ Get From The Airport To Your Accommodation
-                        Without A Hitch.</p>
-                    <p class="mt-1 pl-7 text-body-xs">We Will Add Taxi Options To Your Booking Confirmation.</p>
-                </div>
-
-                <div>
-                    <h3 class="text-label-m">Special Requests</h3>
-                    <p class="mt-2 text-body-xs">Special Requests Can Not Be Guaranteed _ But The Property Will Do Its
-                        Best To Meet Your Needs.</p>
-                    <p class="mt-2 text-body-xs">You Can Always Make A Special Request After Your Booking Is Complete!
-                    </p>
-                    <p class="mt-2 text-body-xxs">(Optional)</p>
-                    <div class="relative">
-                        <textarea rows="4" :class="field" />
-                        <Icon name="icon-park-outline:edit" size="14"
-                            class="pointer-events-none absolute left-2 top-2 text-gray-400" />
-                    </div>
-                    <label class="mt-3 flex items-center gap-3 text-body-xs">
-                        <input type="checkbox" :class="check" />I Would Like Rooms Close To Each Other
-                    </label>
-                </div>
-
-                <div>
-                    <h3 class="text-label-m">Your Arrival Time</h3>
-                    <ul class="mt-2 space-y-2 text-body-xs">
-                        <li class="flex items-center gap-2">
-                            <Icon name="icon-park-outline:check-one" size="16" />Your Rooms Will Be Ready For Check_in
-                            Between 15:00 And 23:00
-                        </li>
-                        <li class="flex items-center gap-2">
-                            <Icon name="icon-park-outline:history" size="16" />24-Huor Front Desk_Help Wherever You Need
-                            It!
-                        </li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h3 class="text-label-m">Add Your Estimated Arrival Time <span
-                            class="text-body-xs font-normal">(Optional)</span></h3>
-                    <select :class="field" class="mt-2 max-w-48">
-                        <option>Please Select</option>
-                    </select>
-                    <p class="mt-1 text-body-xxs">Time for <b>CET</b> time zone</p>
-                </div>
-            </section>
-
-            <section :class="card">
-                <h2 class="text-h5">Bank Card Information</h2>
-                <div class="mt-4 grid grid-cols-[1fr_1.4fr_72px_72px] gap-3">
-                    <label>
-                        <span class="mb-1 block text-caption-s">Full Name On The Card</span>
-                        <input v-model="form.cardName" type="text" placeholder="Anna Carina"
-                            :class="fieldCls('cardName')" @blur="validateField('cardName')"
-                            @input="onInput('cardName')" />
-                        <span v-if="errors.cardName" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.cardName }}</span>
-                    </label>
-                    <label>
-                        <span class="mb-1 block text-caption-s">Card Number</span>
-                        <span class="flex items-center gap-2" :class="fieldCls('cardNumber')">
-                            <Icon name="icon-park-outline:bank-card" size="16" class="text-gray-400" />
-                            <input v-model="form.cardNumber" type="text" inputmode="numeric"
-                                placeholder="................" class="w-full outline-none"
-                                @blur="validateField('cardNumber')" @input="formatCard" />
                         </span>
-                        <span v-if="errors.cardNumber" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.cardNumber }}</span>
-                    </label>
-                    <label>
-                        <span class="mb-1 block text-caption-s">EXP Date</span>
-                        <input v-model="form.exp" type="text" inputmode="numeric" placeholder="**/**"
-                            :class="fieldCls('exp')" @blur="validateField('exp')" @input="formatExp" />
-                        <span v-if="errors.exp" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.exp }}</span>
-                    </label>
-                    <label>
-                        <span class="mb-1 block text-caption-s">CVC</span>
-                        <input v-model="form.cvc" type="text" inputmode="numeric" placeholder="***"
-                            :class="fieldCls('cvc')" @blur="validateField('cvc')" @input="formatCvc" />
-                        <span v-if="errors.cvc" data-error class="mt-1 block text-body-xxs text-error-light">{{
-                            errors.cvc }}</span>
-                    </label>
-                </div>
+                    </div>
 
-                <div class="mt-6 grid gap-3 sm:grid-cols-2">
-                    <button type="button"
-                        class="flex items-center justify-center gap-2 rounded-sm border border-gray-300 bg-white py-3 text-button-m text-primary-500 hover:border-primary-500">
-                        Save In Shortcut
-                        <Icon name="icon-park-outline:like" size="14" />
-                    </button>
-                    <button type="button"
-                        class="rounded-sm bg-primary-500 py-3 text-button-l text-white hover:bg-primary-600"
-                        @click="submit">
-                        Payment
-                    </button>
+                    <!-- Locked once the seats are held: card payment is for exactly these details -->
+                    <fieldset :disabled="!!prebook" class="mt-4 min-w-0 space-y-3 border-0 p-0">
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            <label>
+                                <span class="mb-1 block text-caption-s">First Name <span
+                                        class="text-error-light">*</span></span>
+                                <input v-model="pf.first" type="text" :class="fieldCls('first')"
+                                    @blur="validateField('first')" @input="onInput('first')" />
+                                <span v-if="err.first" data-error class="mt-1 block text-body-xxs text-error-light">{{
+                                    err.first }}</span>
+                            </label>
+                            <label>
+                                <span class="mb-1 block text-caption-s">Last Name <span
+                                        class="text-error-light">*</span></span>
+                                <input v-model="pf.last" type="text" :class="fieldCls('last')"
+                                    @blur="validateField('last')" @input="onInput('last')" />
+                                <span v-if="err.last" data-error class="mt-1 block text-body-xxs text-error-light">{{
+                                    err.last }}</span>
+                            </label>
+                            <label>
+                                <span class="mb-1 block text-caption-s">Phone Number <span
+                                        class="text-error-light">*</span></span>
+                                <span class="flex items-center gap-1" :class="fieldCls('phone')">
+                                    <span class="text-gray-400">+</span>
+                                    <input v-model="pf.code" type="tel" inputmode="numeric" placeholder="46"
+                                        maxlength="4" class="w-9 outline-none" @blur="validateField('code')"
+                                        @input="onInput('code')" />
+                                    <input v-model="pf.phone" type="tel" placeholder="764378888888"
+                                        class="w-full min-w-0 outline-none" @blur="validateField('phone')"
+                                        @input="onInput('phone')" />
+                                </span>
+                                <span v-if="err.code || err.phone" data-error
+                                    class="mt-1 block text-body-xxs text-error-light">{{ phoneError }}</span>
+                            </label>
+                        </div>
+
+                        <!-- Required by the airline for every passenger -->
+                        <div v-for="(t, i) in travellers" :key="i" class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                            <p v-if="i > 0" class="col-span-2 text-label-m md:col-span-4">{{ t.label }}</p>
+                            <template v-if="i > 0">
+                                <label class="md:col-span-2">
+                                    <span class="mb-1 block text-caption-s">First Name <span
+                                            class="text-error-light">*</span></span>
+                                    <input v-model="pf[k(i, 'first')]" type="text" :class="fieldCls(k(i, 'first'))"
+                                        @blur="validateField(k(i, 'first'))" @input="onInput(k(i, 'first'))" />
+                                    <span v-if="err[k(i, 'first')]" data-error
+                                        class="mt-1 block text-body-xxs text-error-light">{{ err[k(i, 'first')]
+                                        }}</span>
+                                </label>
+                                <label class="md:col-span-2">
+                                    <span class="mb-1 block text-caption-s">Last Name <span
+                                            class="text-error-light">*</span></span>
+                                    <input v-model="pf[k(i, 'last')]" type="text" :class="fieldCls(k(i, 'last'))"
+                                        @blur="validateField(k(i, 'last'))" @input="onInput(k(i, 'last'))" />
+                                    <span v-if="err[k(i, 'last')]" data-error
+                                        class="mt-1 block text-body-xxs text-error-light">{{ err[k(i, 'last')] }}</span>
+                                </label>
+                            </template>
+                            <label v-else class="col-span-2">
+                                <span class="mb-1 block text-caption-s">Email <span
+                                        class="text-error-light">*</span></span>
+                                <input v-model="pf.email" type="email" :class="fieldCls('email')"
+                                    @blur="validateField('email')" @input="onInput('email')" />
+                                <span v-if="err.email" data-error class="mt-1 block text-body-xxs text-error-light">{{
+                                    err.email }}</span>
+                            </label>
+                            <label class="col-span-2">
+                                <span class="mb-1 block text-caption-s">Date Of Birth <span
+                                        class="text-error-light">*</span></span>
+                                <input v-model="pf[k(i, 'birth')]" type="date" :class="fieldCls(k(i, 'birth'))"
+                                    @blur="validateField(k(i, 'birth'))" @input="onInput(k(i, 'birth'))" />
+                                <span v-if="err[k(i, 'birth')]" data-error
+                                    class="mt-1 block text-body-xxs text-error-light">{{ err[k(i, 'birth')]
+                                    }}</span>
+                            </label>
+                            <label>
+                                <span class="mb-1 block text-caption-s">Gender <span
+                                        class="text-error-light">*</span></span>
+                                <span class="relative block">
+                                    <select v-model="pf[k(i, 'gender')]" :class="fieldCls(k(i, 'gender'))"
+                                        class="appearance-none pr-10" @change="validateField(k(i, 'gender'))">
+                                        <option value="" disabled>Select</option>
+                                        <option value="M">Male</option>
+                                        <option value="F">Female</option>
+                                    </select>
+                                    <Icon name="icon-park-outline:down" size="14"
+                                        class="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                                </span>
+                                <span v-if="err[k(i, 'gender')]" data-error
+                                    class="mt-1 block text-body-xxs text-error-light">{{ err[k(i, 'gender')]
+                                    }}</span>
+                            </label>
+                            <label>
+                                <span class="mb-1 block text-caption-s">Nationality <span
+                                        class="text-error-light">*</span></span>
+                                <input v-model="pf[k(i, 'nat')]" type="text" maxlength="2" placeholder="SE"
+                                    :class="fieldCls(k(i, 'nat'))" @blur="validateField(k(i, 'nat'))"
+                                    @input="onUpper(k(i, 'nat'))" />
+                                <span v-if="err[k(i, 'nat')]" data-error
+                                    class="mt-1 block text-body-xxs text-error-light">{{ err[k(i, 'nat')]
+                                    }}</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <!-- The payment SDK draws the card fields here. Card data never touches our server. -->
+                    <div v-if="prebook" class="mt-3">
+                        <div id="liteapi-payment" class="min-h-24" />
+                        <p v-if="!sdkReady && !payError" class="mt-3 text-body-xs text-gray-500">Loading payment form...
+                        </p>
+                        <button type="button" class="mt-2 text-body-xxs text-primary-500 underline"
+                            @click="startOver">Change
+                            details</button>
+                    </div>
+
+                    <h3 class="mt-4 text-h6">Cancellation Policy</h3>
+                    <p class="mt-1 text-body-xs">
+                        {{ detail.refundable ? 'This fare is refundable.' : 'This fare is non-refundable.' }}
+                        {{ detail.changeable ? 'Changes are allowed.' : 'Changes are not allowed.' }}
+                        <button v-if="detail.terms.length" type="button"
+                            class="inline-flex items-center gap-1 font-bold" @click="showTerms = !showTerms">
+                            Read More
+                            <Icon name="icon-park-outline:down" size="12" />
+                        </button>
+                    </p>
+                    <ul v-if="showTerms" class="mt-2 list-disc space-y-1 pl-5 text-body-xs">
+                        <li v-for="t in detail.terms" :key="t.message">{{ t.message }}</li>
+                    </ul>
+
+                    <p v-if="payError" class="mt-4 text-body-xs text-error-light">{{ payError }}</p>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <button v-if="!prebook" type="button" :disabled="submitting"
+                                class="w-full rounded-sm bg-primary-500 py-2.5 text-button-m text-white hover:bg-primary-600 disabled:opacity-60"
+                                @click="continueToPayment">
+                                {{ submitting ? 'Reserving your seats...' : 'Confirm And Pay' }}
+                            </button>
+                            <p v-else class="rounded-sm bg-gray-100 py-3 text-center text-body-xs">Enter your card
+                                above, then press Pay.
+                            </p>
+                            <p class="mt-1 text-body-xxs text-gray-400">Check Your Information Before Submitting</p>
+                        </div>
+                        <div>
+                            <button type="button"
+                                class="flex w-full items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white py-2.5 text-button-m text-primary-500 hover:bg-primary-500 hover:text-white">
+                                Save If You Like It
+                                <Icon name="icon-park-outline:like" size="14" />
+                            </button>
+                            <p class="mt-1 text-body-xxs text-gray-400">Save Your Flight Into Your Favourites</p>
+                        </div>
+                    </div>
                 </div>
-            </section>
-        </div>
+            </div>
+        </section>
     </div>
 </template>

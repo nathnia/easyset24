@@ -1,29 +1,78 @@
 <script setup lang="ts">
+import { useAirportsStore } from '~/stores/airports'
+import { flightBookingKey, flightStatusLabel, rememberFlight, toFlightBooking } from '~/utils/flightBooking'
+import type { FlightBooking } from '~/utils/flightBooking'
+
 useHead({ title: 'Digital Ticket' })
+
+const route = useRoute()
+const airports = useAirportsStore()
+const { user } = useAuth()
+
+const pid = String(route.query.pid ?? '')
+const tid = String(route.query.tid ?? '')
+
+const status = ref<'loading' | 'done' | 'error'>('loading')
+const error = ref('')
+const booking = ref<FlightBooking | null>(null)
+let running = false
 
 const columns = 'grid-cols-[240fr_300fr_260fr_125fr]'
 
-const segments = [
-    {
-        airline: 'Lufthansa', icon: 'simple-icons:lufthansa', iconClass: 'text-gray-900', ring: true,
-        code: 'Tk 881', cabin: 'Economy Class', duration: '3:45h', connecting: false,
-        from: { time: '12:00 PM', date: 'Thursday , April 6', city: 'Stockholm(Sweden)', airport: 'Stockholm Arlanda Airport (ARN)' },
-        to: { time: '15:45 PM', date: 'Thursday , April 6', city: 'Rome (Italy)', airport: 'Rome Fiumicino Airport (FCO)' },
-    },
-    {
-        airline: 'British Airways', icon: 'simple-icons:britishairways', iconClass: 'text-airline-british', ring: false,
-        code: 'Tk 29', cabin: 'Economy Class', duration: '2 Hours', connecting: true,
-        from: { time: '21:45 PM', date: 'Thursday , April 6', city: 'Rome (Italy)', airport: 'Rome Fiumicino Airport (FCO)' },
-        to: { time: '23:45 PM', date: 'Thursday , April 6', city: 'Istanbul (Turkiye)', airport: 'Sabha (SAW)' },
-    },
-]
+// "Stockholm (ARN)" once the city is known, else the airport name
+const place = (code: string, name: string) => airports.known[code]?.city ? `${airports.known[code]!.city} (${code})` : name || code
 
-const layovers = [
-    { title: 'Layovers & Connecting Flights For Rome, Italy', airport: 'Italy Fiumicino airport', duration: '4h 45m' },
-]
+const segments = computed(() => (booking.value?.segments ?? []).map((s) => ({
+    ...s,
+    from: { ...s.from, city: place(s.from.code, s.from.airport) },
+    to: { ...s.to, city: place(s.to.code, s.to.airport) },
+})))
+const layovers = computed(() => (booking.value?.layovers ?? []).map((l) => l && ({
+    title: 'Layover & Connecting Flight',
+    airport: l.airport,
+    duration: l.duration,
+})))
 
-const barcodeNumber = '(01)95012345678903(3103)000012'
+const isPending = computed(() => booking.value?.status === 'PENDING_CONFIRMATION')
+const barcodeNumber = computed(() => booking.value?.pnr || booking.value?.bookingId || '')
 const barcodeStripes = 'repeating-linear-gradient(to bottom, #111 0 3px, #fff 3px 5px, #111 5px 6px, #fff 6px 9px, #111 9px 12px, #fff 12px 13px)'
+
+async function run() {
+    if (running) return
+    running = true
+    status.value = 'loading'
+    error.value = ''
+    try {
+        if (!pid || !tid) throw new Error('Payment reference is missing.')
+        if (route.query.redirect_status && route.query.redirect_status !== 'succeeded') {
+            throw new Error('The payment was not completed. You were not charged for a booking.')
+        }
+
+        // Already booked (page refresh): show it. The book call is also safe to repeat for the same prebook.
+        const saved = sessionStorage.getItem(flightBookingKey(pid))
+        if (saved) {
+            booking.value = JSON.parse(saved)
+        } else {
+            const res = await $fetch('/api/flight-book', { method: 'POST', body: { prebookId: pid, transactionId: tid } })
+            const b = toFlightBooking(res)
+            if (!b.bookingId) throw new Error('The booking was not confirmed.')
+            booking.value = b
+            sessionStorage.setItem(flightBookingKey(pid), JSON.stringify(b))
+        }
+        status.value = 'done'
+        rememberFlight(user.value?.email ?? '', booking.value!.bookingId)
+        // city names for the airport codes (not awaited: the ticket is already usable)
+        const codes = new Set(booking.value!.segments.flatMap((s) => [s.from.code, s.to.code]))
+        void Promise.all([...codes].filter(Boolean).map((c) => airports.lookup(c)))
+    } catch (e: any) {
+        error.value = e?.data?.data?.description || e?.data?.statusMessage || e?.statusMessage || e?.message || 'Booking failed.'
+        status.value = 'error'
+    } finally {
+        running = false
+    }
+}
+
+onMounted(run)
 
 const terms = [
     'If You Are Purchasing Your Ticket Using A Debit Or Credit Card Via The Website, We Will Process These Payments Via The Automated Secure Common Payment Gateway Which Will Be Subject To Fraud Screening Purposes.',
@@ -34,9 +83,41 @@ const terms = [
 
 <template>
     <div class="page-container pb-12">
-        <section class="bg-white px-8 py-12">
+        <p v-if="status === 'loading'" class="py-10 text-body-s text-gray-500">Confirming your booking, please wait...
+        </p>
+
+        <section v-else-if="status === 'error'" class="rounded-md bg-white p-4 md:p-6">
+            <h1 class="text-h4">We could not confirm your booking</h1>
+            <p class="mt-3 text-body-m text-error-light">{{ error }}</p>
+            <p v-if="tid" class="mt-3 text-body-s">
+                If you were charged, contact EasySet24 with this payment reference:
+                <b>{{ tid }}</b>
+            </p>
+            <div class="mt-6 flex gap-3">
+                <button v-if="pid && tid" type="button"
+                    class="rounded-sm bg-primary-500 px-6 py-3 text-button-l text-white hover:bg-primary-600"
+                    @click="run">
+                    Try again
+                </button>
+                <NuxtLink to="/flights"
+                    class="rounded-sm border border-primary-500 px-6 py-3 text-button-l text-primary-500">
+                    Back to flights
+                </NuxtLink>
+            </div>
+        </section>
+
+        <section v-else-if="booking" class="bg-white px-8 py-12">
             <h1 class="text-h3">Digital Ticket</h1>
             <p class="mt-3 text-label-m">It Is Not Necessary To Print Your Ticket</p>
+            <p class="mt-2 text-body-m">
+                Booking Number <b>{{ booking.bookingId }}</b>
+                <template v-if="booking.pnr"> - Airline Reference <b>{{ booking.pnr }}</b></template>
+                <template v-if="booking.status"> - <span class="text-primary-500">{{ flightStatusLabel(booking.status)
+                        }}</span></template>
+            </p>
+            <p v-if="isPending" class="mt-1 text-body-xs text-gray-500">
+                Your booking is saved. The airline has not confirmed the ticket yet.
+            </p>
 
             <div class="mt-10 flex gap-4 rounded-md border border-gray-300 p-4 max-lg:flex-col">
                 <div class="min-w-0 flex-1 overflow-x-auto">
@@ -72,9 +153,12 @@ const terms = [
                                 :class="columns">
                                 <div class="flex flex-col justify-between gap-6 p-3">
                                     <p class="flex items-center gap-3 text-h6">
-                                        <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full"
-                                            :class="s.ring ? 'border border-gray-900' : ''">
-                                            <Icon :name="s.icon" size="32" :class="s.iconClass" />
+                                        <span
+                                            class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gray-900">
+                                            <img v-if="s.logoUrl" :src="s.logoUrl" alt=""
+                                                class="h-9 w-9 object-contain" />
+                                            <Icon v-else name="icon-park-outline:airplane" size="32"
+                                                class="text-gray-900" />
                                         </span>
                                         {{ s.airline }}
                                     </p>
