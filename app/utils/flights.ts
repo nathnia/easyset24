@@ -72,6 +72,7 @@ export interface FlightLeg {
   landing: string; // "05:55"
   dayChange: number; // arrives N days later
   duration: string; // "7h 45m"
+  minutes: number; // duration in minutes (for filters)
   stops: number;
   stopText: string; // "Non-stop" / "1 stop (3h 5m layover)"
   via: string; // "Direct flight" / "FCO Rome Fiumicino"
@@ -159,6 +160,7 @@ function buildLeg(journey: any, dir: "OUTBOUND" | "INBOUND"): FlightLeg | null {
     landing: time(last.arrivalTime),
     dayChange: Math.max(0, dayDiff(first.departureTime, last.arrivalTime)),
     duration: formatMinutes(minutes),
+    minutes: Number(minutes) || 0,
     stops,
     stopText:
       stops === 0
