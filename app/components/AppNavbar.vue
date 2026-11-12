@@ -27,9 +27,6 @@ const active = computed(() => {
     return ''
 })
 
-// heart opens the favourites of the section you are in (flights, else hotels)
-const favTo = computed(() => route.path.startsWith('/flights') ? '/flights/favourites' : '/hotels/favourites')
-
 const tabBase = 'w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]'
 const tabActive = 'border-primary-500 bg-primary-500 text-white'
 const authBtn =
@@ -71,7 +68,7 @@ const authBtn =
                     <NuxtLink to="/help" aria-label="Help" class="shrink-0">
                         <Icon name="icon-park-outline:help" size="18" class="text-primary-500" />
                     </NuxtLink>
-                    <NuxtLink :to="favTo" aria-label="Favourites" class="shrink-0">
+                    <NuxtLink to="/favourites" aria-label="Favourites" class="shrink-0">
                         <Icon name="icon-park-outline:like" size="18" class="text-primary-500" />
                     </NuxtLink>
                     <NuxtLink to="/customer-service" aria-label="Customer service" class="shrink-0">

@@ -362,7 +362,7 @@ watch(filtered, () => { page.value = 1 })
 
                 <div v-if="!loading && !error"
                     class="mt-12 flex flex-col items-center justify-between gap-6 border-t border-gray-300 pt-8 md:flex-row">
-                    <NuxtLink to="/flights/favourites"
+                    <NuxtLink to="/favourites?tab=flights"
                         class="flex items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white px-8 py-3 text-button-xxl text-primary-500 hover:bg-primary-500 hover:text-white">
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />

@@ -248,7 +248,7 @@ function clearFilters() {
                 </div>
 
                 <div class="mt-8 flex flex-col justify-between gap-4 sm:flex-row">
-                    <NuxtLink to="/hotels/favourites"
+                    <NuxtLink to="/favourites?tab=hotels"
                         class="flex items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white px-8 py-3 text-button-xxl text-primary-500 hover:bg-primary-500 hover:text-white">
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />
