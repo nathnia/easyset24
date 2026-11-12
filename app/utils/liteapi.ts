@@ -21,6 +21,16 @@ export type PriceState = number | null | "error";
 
 const PLACEHOLDER_IMAGE = "https://picsum.photos/seed/easyset-hotel/800/600";
 
+// guest score (0-10) -> word, same steps as the Guests Rating filter
+export function ratingWord(score?: number) {
+  if (!score) return "";
+  if (score >= 9) return "Outstanding";
+  if (score >= 8) return "Very Good";
+  if (score >= 7) return "Good";
+  if (score >= 5) return "Fair";
+  return "Poor";
+}
+
 export function toHotelCard(
   h: LiteApiHotel,
   price?: PriceState,
@@ -32,12 +42,15 @@ export function toHotelCard(
     name: h.name,
     image: h.main_photo || h.thumbnail || PLACEHOLDER_IMAGE,
     location: [h.address, h.city].filter(Boolean).join(", "),
-    ratingLabel: stars ? `${stars} Stars` : "",
+    ratingLabel: ratingWord(h.rating),
     reviews: h.reviewCount
       ? `${h.reviewCount.toLocaleString("en-US")} Reviews`
       : "",
     rating: h.rating ? h.rating.toFixed(1) : "-",
     price: formatPrice(price),
+    starCount: stars ?? 0,
+    score: h.rating ?? 0,
+    amount: typeof price === "number" ? price : null,
     guests: stay
       ? `${stay.adults} ${stay.adults === 1 ? "Adult" : "Adults"}`
       : undefined,

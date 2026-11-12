@@ -31,7 +31,10 @@ useLazyAsyncData('facilities', async () => {
 }, { server: false })
 const showAllFacilities = ref(false)
 const shownFacilities = computed(() => showAllFacilities.value ? facilities.value : facilities.value.slice(0, 6))
-const otherGroups = filterGroups.filter((g) => g.key !== 'popular')
+// Stars and Guests Rating are real. The other groups have no LiteAPI data and stay as decoration.
+const otherGroups = filterGroups
+    .filter((g) => g.key !== 'popular')
+    .map((g) => g.key === 'rating' ? { ...g, options: ['All', 'Outstanding 9+', 'Very Good 8+', 'Good 7+'] } : g)
 
 const mapZoom = 11
 const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
@@ -44,16 +47,16 @@ const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
 const selected = reactive<Record<string, any>>({
     popular: ['Free Cancellation'],
     room: ['See View'],
-    rating: 'Very Good 8+',
+    rating: 'All',
     bed: 'Baby Cots',
     leisure: ['Bar'],
     sustain: '',
-    stars: '3 Stars',
+    stars: '',
     distance: 'Less Than 15 Km',
 })
 
-const RANGE_MAX = 500
-const range = reactive({ min: 0, max: 250 })
+const priceLimit = ref(500)
+const range = reactive({ min: 0, max: 500 })
 const minText = ref('')
 const maxText = ref('')
 
@@ -74,14 +77,47 @@ function setMin(e: Event) {
 }
 function setMax(e: Event) {
     const n = Number((e.target as HTMLInputElement).value)
-    if (!Number.isNaN(n)) range.max = clamp(n, range.min, RANGE_MAX)
+    if (!Number.isNaN(n)) range.max = clamp(n, range.min, priceLimit.value)
     maxText.value = String(range.max)
 }
 
 const fillStyle = computed(() => ({
-    left: `${(range.min / RANGE_MAX) * 100}%`,
-    width: `${((range.max - range.min) / RANGE_MAX) * 100}%`,
+    left: `${(range.min / priceLimit.value) * 100}%`,
+    width: `${((range.max - range.min) / priceLimit.value) * 100}%`,
 }))
+
+// slider limit follows the real prices (rounded up to 50); untouched slider follows it
+watch(() => store.prices, (p) => {
+    const nums = Object.values(p).filter((v): v is number => typeof v === 'number')
+    if (!nums.length) return
+    const n = Math.max(50, Math.ceil(Math.max(...nums) / 50) * 50)
+    if (n === priceLimit.value) return
+    const atEnd = range.max >= priceLimit.value
+    priceLimit.value = n
+    range.max = atEnd ? n : Math.min(range.max, n)
+    range.min = Math.min(range.min, range.max)
+}, { deep: true })
+
+// ---- filters on the loaded hotels (frontend only)
+const priceActive = computed(() => range.min > 0 || range.max < priceLimit.value)
+const starsWanted = computed(() => parseInt(selected.stars) || 0)
+const ratingWanted = computed(() => Number(/(\d+)\+/.exec(String(selected.rating))?.[1]) || 0)
+const filtersActive = computed(() => priceActive.value || !!starsWanted.value || !!ratingWanted.value || facilityIds.value.length > 0)
+
+const shown = computed(() => hotels.value.filter((h) => {
+    if (starsWanted.value && Math.floor(h.starCount) !== starsWanted.value) return false
+    if (ratingWanted.value && h.score < ratingWanted.value) return false
+    if (priceActive.value && (h.amount === null || h.amount < range.min || h.amount > range.max)) return false
+    return true
+}))
+
+function clearFilters() {
+    range.min = 0
+    range.max = priceLimit.value
+    selected.stars = ''
+    selected.rating = 'All'
+    facilityIds.value = []
+}
 </script>
 
 <template>
@@ -109,7 +145,7 @@ const fillStyle = computed(() => ({
                     <Icon name="icon-park-outline:sort-two" size="18" />
                 </button>
                 <h2 class="mt-5 text-h4 text-gray-500">{{ city }}</h2>
-                <p class="mt-1 text-body-xxs">{{ hotels.length }}{{ hasMore ? '+' : '' }} Properties Found</p>
+                <p class="mt-1 text-body-xxs">{{ shown.length }}{{ hasMore ? '+' : '' }} Properties Found</p>
                 <p class="mt-4 max-w-xl text-body-s text-gray-500">
                     Travel Professionals Dedicated To Simplifying Your Travel Experience By Curating Flight And
                     Accommodation
@@ -120,8 +156,13 @@ const fillStyle = computed(() => ({
         </section>
 
         <section class="page-container mt-10 grid gap-8 lg:grid-cols-[300px_1fr]">
-            <aside>
-                <h2 class="text-h4 text-gray-500">Filter By</h2>
+            <aside
+                class="lg:sticky lg:top-24 lg:-mx-3 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:px-3 lg:pb-4 lg:[scrollbar-width:thin]">
+                <div class="flex items-baseline justify-between">
+                    <h2 class="text-h4 text-gray-500">Filter By</h2>
+                    <button v-if="filtersActive" type="button" class="text-body-xxs text-primary-500 underline"
+                        @click="clearFilters">Clear all</button>
+                </div>
                 <p class="mt-4 text-body-s">Your Budget For Per Night</p>
 
                 <div class="relative mt-3 h-6 w-full">
@@ -129,10 +170,10 @@ const fillStyle = computed(() => ({
                         class="pointer-events-none absolute inset-x-2.75 top-1/2 h-1 -translate-y-1/2 rounded-full bg-gray-400">
                         <div class="absolute h-full bg-primary-500" :style="fillStyle" />
                     </div>
-                    <input v-model.number="range.min" type="range" min="0" :max="RANGE_MAX" step="5"
+                    <input v-model.number="range.min" type="range" min="0" :max="priceLimit" step="5"
                         aria-label="Minimum price" class="range-input range-min"
-                        :style="{ zIndex: range.min > RANGE_MAX / 2 ? 5 : 3 }" />
-                    <input v-model.number="range.max" type="range" min="0" :max="RANGE_MAX" step="5"
+                        :style="{ zIndex: range.min > priceLimit / 2 ? 5 : 3 }" />
+                    <input v-model.number="range.max" type="range" min="0" :max="priceLimit" step="5"
                         aria-label="Maximum price" class="range-input range-max" style="z-index: 4" />
                 </div>
 
@@ -196,8 +237,13 @@ const fillStyle = computed(() => ({
                 <p v-else-if="!hotels.length" class="text-body-s text-gray-500">
                     No hotels found for "{{ city }}" ({{ country }}).
                 </p>
+                <p v-else-if="!shown.length" class="text-body-s text-gray-500">
+                    No loaded hotels match your filters.
+                    <button type="button" class="ml-1 text-primary-500 underline" @click="clearFilters">Clear
+                        all</button>
+                </p>
                 <div v-else class="space-y-6">
-                    <HotelCard v-for="h in hotels" :key="h.id" :hotel="h"
+                    <HotelCard v-for="h in shown" :key="h.id" :hotel="h"
                         :to="`/hotels/${h.id}?checkin=${stay.checkin}&checkout=${stay.checkout}&adults=${stay.adults}`" />
                 </div>
 
