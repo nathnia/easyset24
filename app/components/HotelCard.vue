@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useFavouritesStore, type FavHotelCard } from '~/stores/favourites'
+
 const props = withDefaults(defineProps<{
     hotel: {
+        id?: string
         name: string
         image: string
         location: string
@@ -22,6 +25,13 @@ const props = withDefaults(defineProps<{
 
 const guests = computed(() => props.hotel.guests ?? '1 Adult, 2 Children')
 const nights = computed(() => props.hotel.nights ?? '4 Nights')
+
+// the heart saves real hotels (cards with an id) in this browser
+const fav = useFavouritesStore()
+const isFav = computed(() => !!props.hotel.id && fav.hasHotel(props.hotel.id))
+function toggleFav() {
+    if (props.hotel.id) fav.toggleHotel(props.hotel as FavHotelCard)
+}
 </script>
 
 <template>
@@ -40,7 +50,8 @@ const nights = computed(() => props.hotel.nights ?? '4 Nights')
             :class="compact ? 'sm:h-58 sm:min-h-0 sm:w-44' : 'sm:min-h-69 sm:w-57.5'">
             <img :src="hotel.image" :alt="hotel.name"
                 class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            <FavButton class="absolute left-3 top-3 z-10" :size="compact ? 'sm' : 'lg'" />
+            <FavButton class="absolute left-3 top-3 z-10" :size="compact ? 'sm' : 'lg'" :active="isFav"
+                @click="toggleFav" />
             <div class="absolute inset-x-0 bottom-0 flex items-center justify-between bg-black/50 px-3"
                 :class="compact ? 'h-9' : 'h-11'">
                 <div class="flex gap-0.5 text-white/80">

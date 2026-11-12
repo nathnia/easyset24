@@ -27,6 +27,9 @@ const active = computed(() => {
     return ''
 })
 
+// heart opens the favourites of the section you are in (flights, else hotels)
+const favTo = computed(() => route.path.startsWith('/flights') ? '/flights/favourites' : '/hotels/favourites')
+
 const tabBase = 'w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]'
 const tabActive = 'border-primary-500 bg-primary-500 text-white'
 const authBtn =
@@ -43,7 +46,9 @@ const authBtn =
                 </NuxtLink>
 
                 <template v-if="!isLoggedIn">
-                    <Icon name="icon-park-outline:help" size="22" class="shrink-0 text-primary-500" />
+                    <NuxtLink to="/help" aria-label="Help" class="shrink-0">
+                        <Icon name="icon-park-outline:help" size="22" class="text-primary-500" />
+                    </NuxtLink>
                     <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
                 </template>
 
@@ -63,9 +68,15 @@ const authBtn =
                     <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
                     <Icon name="icon-park-outline:dollar" size="18" class="shrink-0 text-primary-500"
                         aria-label="Currency" />
-                    <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
-                    <Icon name="icon-park-outline:like" size="18" class="shrink-0 text-primary-500" />
-                    <Icon name="icon-park-outline:phone-call" size="18" class="shrink-0 text-primary-500" />
+                    <NuxtLink to="/help" aria-label="Help" class="shrink-0">
+                        <Icon name="icon-park-outline:help" size="18" class="text-primary-500" />
+                    </NuxtLink>
+                    <NuxtLink :to="favTo" aria-label="Favourites" class="shrink-0">
+                        <Icon name="icon-park-outline:like" size="18" class="text-primary-500" />
+                    </NuxtLink>
+                    <NuxtLink to="/customer-service" aria-label="Customer service" class="shrink-0">
+                        <Icon name="icon-park-outline:phone-call" size="18" class="text-primary-500" />
+                    </NuxtLink>
                     <AccountMenu />
                 </div>
             </div>

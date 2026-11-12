@@ -157,7 +157,7 @@ function clearFilters() {
 
         <section class="page-container mt-10 grid gap-8 lg:grid-cols-[300px_1fr]">
             <aside
-                class="lg:sticky lg:top-24 lg:-mx-3 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:px-3 lg:pb-4 lg:[scrollbar-width:thin]">
+                class="lg:sticky lg:top-24 lg:-mx-3 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:px-3 lg:pb-4 lg:scrollbar-thin">
                 <div class="flex items-baseline justify-between">
                     <h2 class="text-h4 text-gray-500">Filter By</h2>
                     <button v-if="filtersActive" type="button" class="text-body-xxs text-primary-500 underline"

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { filterGroups } from '~/data/flights'
 import { useAirportsStore } from '~/stores/airports'
+import { useFavouritesStore } from '~/stores/favourites'
 import { useFlightsStore } from '~/stores/flights'
-import { flightQueryFromRoute, formatFlightPrice } from '~/utils/flights'
+import { flightQueryFromRoute, formatFlightPrice, type FlightCard } from '~/utils/flights'
 
 useHead({ title: 'Flight Search Result' })
 
@@ -20,6 +21,16 @@ useLazyAsyncData('flights', async () => {
 
 // "Stockholm" if we know the city, else the airport name from the offer
 const place = (code: string, fallback: string) => airports.known[code]?.city || fallback || code
+
+// the heart saves a flight in this browser; its link brings the person back to these results
+const fav = useFavouritesStore()
+function toggleFav(a: FlightCard) {
+    fav.toggleFlight(a, {
+        fromCity: place(a.out.fromCode, a.out.fromName),
+        toCity: place(a.out.toCode, a.out.toName),
+        link: route.fullPath,
+    })
+}
 
 // airline logos that failed to load: fall back to the airline code
 const logoFailed = reactive<Record<string, boolean>>({})
@@ -164,7 +175,7 @@ watch(filtered, () => { page.value = 1 })
 
         <section class="page-container mt-12 grid gap-8 lg:grid-cols-[300px_1fr]">
             <aside
-                class="lg:sticky lg:top-24 lg:-mx-3 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:px-3 lg:pb-4 lg:[scrollbar-width:thin]">
+                class="lg:sticky lg:top-24 lg:-mx-3 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:px-3 lg:pb-4 lg:scrollbar-thin">
                 <div v-for="s in sliders" :key="s.title" class="mb-10 max-w-66.25">
                     <p class="text-body-xs">{{ s.title }}</p>
 
@@ -264,18 +275,20 @@ watch(filtered, () => { page.value = 1 })
                                     class="h-10 w-10 object-contain" @error="logoFailed[a.key] = true" />
                                 <span v-else class="text-label-m font-bold">{{ a.airlineCode }}</span>
                             </span>
+                            <FavButton class="absolute right-2 top-2 z-10" size="sm"
+                                :active="fav.isFlightFav(a, route.fullPath)" @click="toggleFav(a)" />
                             <div
                                 class="absolute inset-x-0 bottom-0 flex h-10 items-center justify-between bg-black/50 px-4 text-white">
                                 <span class="truncate text-h6">{{ a.airline }}</span>
                                 <span class="shrink-0 rounded-sm border border-white/80 px-1 text-button-s">{{ a.cabin
-                                    }}</span>
+                                }}</span>
                             </div>
                         </div>
 
                         <div class="grid flex-1 content-between gap-x-4 gap-y-5 py-2 pr-2 md:grid-cols-3">
                             <p class="flex items-center rounded-sm bg-gray-200 px-3 py-3 text-h6">
                                 From <span class="ml-2 text-primary-500">{{ place(a.out.fromCode, a.out.fromName)
-                                    }}</span>
+                                }}</span>
                             </p>
                             <div class="text-center">
                                 <svg viewBox="0 0 200 40" class="mx-auto h-6 w-full max-w-48" fill="none"
@@ -331,7 +344,7 @@ watch(filtered, () => { page.value = 1 })
 
                             <div class="flex items-center justify-between gap-3">
                                 <span class="text-h3 text-success-dark">{{ formatFlightPrice(a.price, a.currency)
-                                    }}</span>
+                                }}</span>
                                 <span v-if="a.seats !== null"
                                     class="rounded-sm bg-success-light px-3 py-2 text-body-xs text-success-dark">{{
                                         a.seats }} {{ a.seats === 1 ? 'seat' : 'seats' }} left</span>
