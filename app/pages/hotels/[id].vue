@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useFavouritesStore } from '~/stores/favourites'
 import { useHotelsStore } from '~/stores/hotels'
 import { formatPrice, stayFromQuery } from '~/utils/liteapi'
 
@@ -26,7 +27,23 @@ useHead({ title: computed(() => hotel.value?.name ?? 'Hotel Information') })
 
 const tabs = ['Place Details', 'Info & Prices', 'Rooms & Beds', 'Place Rules']
 const activeTab = ref(tabs[0])
-const liked = ref(false)
+
+// the heart saves this hotel in the favourites page (this browser only)
+const fav = useFavouritesStore()
+const liked = computed(() => !!hotel.value && fav.hasHotel(hotel.value.id))
+function toggleLiked() {
+    const h = hotel.value
+    if (!h) return
+    fav.toggleHotel({
+        id: h.id,
+        name: h.name,
+        image: h.images[0] ?? '',
+        location: h.address,
+        rating: h.rating,
+        ratingLabel: h.ratingLabel,
+        price: String(detailPrice.value ?? ''),
+    })
+}
 
 watch(activeTab, (t) => {
     if (t === 'Rooms & Beds' || t === 'Info & Prices') store.fetchRooms(String(route.params.id), stay.value)
@@ -135,7 +152,7 @@ const scroll = (dir: 1 | -1) =>
                             <div class="flex flex-col gap-3">
                                 <p class="text-body-xs">
                                     <b class="text-label-m">{{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults'
-                                    }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
+                                        }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
                                     Rooms ,Double Bed
                                 </p>
                                 <p class="flex items-center gap-2 text-body-xs">
@@ -149,7 +166,7 @@ const scroll = (dir: 1 | -1) =>
                                 <div class="flex gap-3 md:justify-end">
                                     <button type="button" aria-label="Add to favourites"
                                         class="flex h-10 w-10 items-center justify-center rounded-sm border border-primary-400 text-primary-500 hover:bg-primary-500 hover:text-white"
-                                        @click="liked = !liked">
+                                        @click="toggleLiked">
                                         <Icon name="icon-park-outline:like" size="18"
                                             :class="liked ? 'text-error-light' : 'text-black'" />
                                     </button>
@@ -166,7 +183,7 @@ const scroll = (dir: 1 | -1) =>
                     <template v-else-if="activeTab === 'Info & Prices'">
                         <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading prices...</p>
                         <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
-                        }}</p>
+                            }}</p>
                         <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
                             No prices available for these dates.
                         </p>
@@ -201,7 +218,7 @@ const scroll = (dir: 1 | -1) =>
                                         class="flex items-center justify-between gap-4 border-b border-gray-300 pb-3">
                                         <span class="text-gray-500">{{ opt.board }} | {{ cancelText(opt) }}</span>
                                         <b class="shrink-0 text-label-m text-success-dark">{{ formatPrice(opt.price)
-                                            }}</b>
+                                        }}</b>
                                     </li>
                                 </ul>
                             </div>
@@ -211,7 +228,7 @@ const scroll = (dir: 1 | -1) =>
                     <template v-else-if="activeTab === 'Rooms & Beds'">
                         <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading rooms...</p>
                         <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
-                        }}</p>
+                            }}</p>
                         <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
                             No rooms available for these dates.
                         </p>
@@ -322,7 +339,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                            }}</span>
+                                }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>

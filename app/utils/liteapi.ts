@@ -129,6 +129,8 @@ export function toHotelDetail(h: LiteApiHotelDetail) {
   return {
     id: h.id,
     name: h.name,
+    rating: h.rating ? h.rating.toFixed(1) : "-",
+    ratingLabel: ratingWord(h.rating),
     images: Array.from(
       { length: 5 },
       (_, i) => urls[i] || h.main_photo || PLACEHOLDER_IMAGE,
