@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useLocationsStore } from '~/stores/locations'
 import { stayFromQuery } from '~/utils/liteapi'
+import { CABIN_OPTIONS, addDays, cabinLabel, flightQueryFromRoute } from '~/utils/flights'
 
 const props = withDefaults(defineProps<{
     type?: 'hotel' | 'flight'
@@ -49,15 +50,19 @@ if (props.type === 'hotel') {
     }, { server: false })
 }
 
-// Flights: From / To airports (IATA codes from LiteAPI), kept in the URL
-const codeFrom = (v: unknown, fallback: string) =>
-    typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : fallback
-const fromCode = ref(codeFrom(useRoute().query.from, 'ARN'))
-const toCode = ref(codeFrom(useRoute().query.to, 'IST'))
+// Flights: everything is kept in the URL (from, to, dates, passengers, cabin)
+const fq = flightQueryFromRoute(useRoute().query)
+const fromCode = ref(fq.from)
+const toCode = ref(fq.to)
+const departDate = ref(fq.depart)
+const returnDate = ref(fq.ret)
+const flightAdults = ref(fq.adults)
+const flightChildren = ref(fq.children)
 const flightError = ref('')
 
-const second = ref(props.vip ?? c.second)
-const third = ref(c.third)
+const isFlight = props.type === 'flight'
+const second = ref(props.vip ?? (isFlight ? (fq.trip === 'one' ? 'One Way' : 'Two Way') : c.second))
+const third = ref(isFlight ? cabinLabel(fq.cabin) : c.third)
 
 const route = useRoute()
 const stay = stayFromQuery(route.query)
@@ -65,6 +70,7 @@ const checkin = ref(stay.checkin)
 const checkout = ref(stay.checkout)
 const adults = ref(stay.adults)
 const today = new Date().toISOString().slice(0, 10)
+const maxDate = addDays(330) // flights can be searched up to 11 months ahead
 
 function search() {
     if (props.type === 'hotel') {
@@ -74,8 +80,29 @@ function search() {
             flightError.value = 'Pick two different airports.'
             return
         }
+        const oneWay = second.value === 'One Way'
+        if (!departDate.value || (!oneWay && !returnDate.value)) {
+            flightError.value = 'Pick your travel dates.'
+            return
+        }
+        if (!oneWay && returnDate.value < departDate.value) {
+            flightError.value = 'The return date must be after the departure date.'
+            return
+        }
         flightError.value = ''
-        navigateTo({ path: c.to, query: { from: fromCode.value, to: toCode.value } })
+        navigateTo({
+            path: c.to,
+            query: {
+                from: fromCode.value,
+                to: toCode.value,
+                depart: departDate.value,
+                ...(oneWay ? {} : { return: returnDate.value }),
+                trip: oneWay ? 'one' : 'two',
+                adults: flightAdults.value,
+                children: flightChildren.value,
+                cabin: CABIN_OPTIONS.find((o) => o.label === third.value)?.value ?? 'ECONOMY',
+            },
+        })
     }
 }
 
@@ -90,7 +117,8 @@ function openPicker(e: Event) {
 }
 
 const field = 'relative flex h-[50px] items-center gap-3 border border-gray-300 bg-white px-3 text-body-s md:-ml-px md:first:ml-0'
-const select = 'w-full appearance-none bg-transparent outline-none'
+const selectBase = 'appearance-none bg-transparent outline-none'
+const select = `w-full ${selectBase}`
 </script>
 
 <template>
@@ -105,7 +133,7 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                     <Icon :name="c.icon" size="22" class="shrink-0 text-gray-500" />
                     <template v-if="type === 'flight'">
                         <AirportInput v-model="fromCode" label="From airport" placeholder="From" />
-                        <Icon name="icon-park-outline:right" size="16" class="shrink-0 text-primary-400" />
+                        <span class="shrink-0">-</span>
                         <AirportInput v-model="toCode" label="To airport" placeholder="To" />
                     </template>
                     <template v-else>
@@ -134,8 +162,21 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                     <select v-if="type === 'hotel'" v-model.number="adults" :class="[select, 'w-28']">
                         <option v-for="n in 6" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}</option>
                     </select>
-                    <span v-else class="whitespace-nowrap">2 Adults - 3 Children</span>
-                    <select v-model="third" :class="[select, 'ml-2']">
+                    <template v-else>
+                        <select v-model.number="flightAdults" aria-label="Adults"
+                            :class="[selectBase, 'w-18 shrink-0']">
+                            <option v-for="n in 9" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}
+                            </option>
+                        </select>
+                        <span class="-mx-1 shrink-0">-</span>
+                        <select v-model.number="flightChildren" aria-label="Children"
+                            :class="[selectBase, 'w-22 shrink-0']">
+                            <option v-for="n in 10" :key="n" :value="n - 1">{{ n - 1 }} {{ n === 2 ? 'Child' :
+                                'Children' }}</option>
+                        </select>
+                    </template>
+                    <select v-model="third"
+                        :class="type === 'hotel' ? [select, 'ml-2'] : [selectBase, 'ml-auto w-28 shrink-0']">
                         <option v-for="o in c.thirdOptions" :key="o">{{ o }}</option>
                     </select>
                     <Icon name="icon-park-outline:sort-two" size="20" class="shrink-0 text-primary-400" />
@@ -153,7 +194,17 @@ const select = 'w-full appearance-none bg-transparent outline-none'
                         <input v-model="checkout" type="date" :min="checkin" required aria-label="Check out"
                             class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
                     </template>
-                    <span v-else class="whitespace-nowrap">18 Dec 2023 - 23 Dec 2023</span>
+                    <template v-else>
+                        <span class="whitespace-nowrap">{{ fmt(departDate) }}<template v-if="second !== 'One Way'"> - {{
+                                fmt(returnDate) }}</template></span>
+                        <input v-model="departDate" type="date" :min="today" :max="maxDate" required
+                            aria-label="Departure date"
+                            :class="['absolute inset-y-0 left-0 cursor-pointer opacity-0', second === 'One Way' ? 'w-full' : 'w-1/2']"
+                            @click="openPicker" />
+                        <input v-if="second !== 'One Way'" v-model="returnDate" type="date" :min="departDate"
+                            :max="maxDate" required aria-label="Return date"
+                            class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                    </template>
                 </div>
             </div>
 

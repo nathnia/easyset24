@@ -1,34 +1,58 @@
 <script setup lang="ts">
-import { filterGroups, airlines, info as baseInfo } from '~/data/flights'
+import { filterGroups } from '~/data/flights'
 import { useAirportsStore } from '~/stores/airports'
+import { useFlightsStore } from '~/stores/flights'
+import { flightQueryFromRoute, formatFlightPrice } from '~/utils/flights'
 
 useHead({ title: 'Flight Search Result' })
 
-// Route comes from the search form (?from=ARN&to=IST); airport names from LiteAPI
+// The search form puts everything in the URL; real offers come from LiteAPI
 const route = useRoute()
 const airports = useAirportsStore()
-useLazyAsyncData('airports', async () => {
-    await airports.fetchAirports()
+const flights = useFlightsStore()
+const { cards, loading, error } = storeToRefs(flights)
+
+useLazyAsyncData('flights', async () => {
+    const q = flightQueryFromRoute(route.query)
+    await Promise.all([airports.lookup(q.from), airports.lookup(q.to), flights.search(q)])
     return true
-}, { server: false })
+}, { server: false, watch: [() => route.fullPath] })
 
-const asCode = (v: unknown, fallback: string) =>
-    typeof v === 'string' && /^[A-Za-z]{3}$/.test(v) ? v.toUpperCase() : fallback
+// "Stockholm" if we know the city, else the airport name from the offer
+const place = (code: string, fallback: string) => airports.known[code]?.city || fallback || code
 
-// flight times, price and stops are still sample data (LiteAPI has no flights)
-const info = computed(() => {
-    const fromCode = asCode(route.query.from, 'ARN')
-    const toCode = asCode(route.query.to, 'IST')
-    const from = airports.find(fromCode)
-    const to = airports.find(toCode)
-    return {
-        ...baseInfo,
-        from: from?.city || from?.name || fromCode,
-        to: to?.city || to?.name || toCode,
-        fromAirport: [fromCode, from?.name].filter(Boolean).join(' '),
-        toAirport: [toCode, to?.name].filter(Boolean).join(' '),
-    }
+// airline logos that failed to load: fall back to the airline code
+const logoFailed = reactive<Record<string, boolean>>({})
+
+// Pagination: the API returns every flight at once, so we page them here
+const PER_PAGE = 10
+const page = ref(1)
+const totalPages = computed(() => Math.max(1, Math.ceil(cards.value.length / PER_PAGE)))
+const pageCards = computed(() => cards.value.slice((page.value - 1) * PER_PAGE, page.value * PER_PAGE))
+const rangeText = computed(() => {
+    const from = (page.value - 1) * PER_PAGE + 1
+    const to = Math.min(page.value * PER_PAGE, cards.value.length)
+    return `Showing ${from}-${to} of ${cards.value.length} flights`
 })
+// 1 ... 4 5 6 ... 12 : first, last, and the pages around the current one
+const pageItems = computed<(number | string)[]>(() => {
+    const total = totalPages.value
+    const keep = new Set([1, total, page.value - 1, page.value, page.value + 1].filter((n) => n >= 1 && n <= total))
+    const nums = [...keep].sort((a, b) => a - b)
+    const out: (number | string)[] = []
+    nums.forEach((n, i) => {
+        if (i > 0 && n - nums[i - 1]! > 1) out.push('...')
+        out.push(n)
+    })
+    return out
+})
+function goTo(p: number) {
+    if (p < 1 || p > totalPages.value || p === page.value) return
+    page.value = p
+    if (import.meta.client) window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+// a new search gives a new list: start again at page 1
+watch(cards, () => { page.value = 1 })
 
 const dep = reactive({ min: 12 * 60, max: 16 * 60 + 45 })
 const dur = reactive({ min: 7, max: 12 })
@@ -143,31 +167,44 @@ const randomFilter = ref(true)
             </aside>
 
             <div>
-                <div class="space-y-12">
-                    <article v-for="(a, i) in airlines" :key="a.name"
+                <p v-if="loading"
+                    class="rounded-md border border-gray-300 bg-white p-8 text-center text-body-s text-gray-500">
+                    Searching flights...
+                </p>
+                <p v-else-if="error"
+                    class="rounded-md border border-gray-300 bg-white p-8 text-center text-body-s text-error-light">
+                    {{ error }}
+                </p>
+                <p v-else-if="!cards.length"
+                    class="rounded-md border border-gray-300 bg-white p-8 text-center text-body-s text-gray-500">
+                    No flights found for this route and date. Try different dates.
+                </p>
+
+                <div v-else class="space-y-12">
+                    <article v-for="a in pageCards" :key="a.key"
                         class="flex flex-col gap-4 rounded-md border border-gray-300 bg-white p-2 transition-shadow hover:shadow-lg md:flex-row">
                         <div class="relative h-72 shrink-0 overflow-hidden rounded-sm bg-gray-300 md:h-auto md:w-62.5">
-                            <img :src="flightImage(a.name)" :alt="a.name"
+                            <img :src="flightImage(a.airline)" :alt="a.airline"
                                 class="absolute inset-0 h-full w-full object-cover"
-                                @error="onFlightImgError($event, a.name)" />
-                            <span class="absolute left-2 top-2 flex h-15 w-15 items-center justify-center rounded-full"
-                                :class="a.logo">
-                                <svg v-if="!a.icon" viewBox="0 0 24 24" class="h-8 w-8" aria-label="Delta">
-                                    <path d="M12 3 22 20H2z" fill="#e01933" />
-                                    <path d="M12 10.5 16.5 18h-9z" fill="#fff" />
-                                </svg>
-                                <Icon v-else :name="a.icon" :size="a.iconSize" />
+                                @error="onFlightImgError($event, a.airline)" />
+                            <span
+                                class="absolute left-2 top-2 flex h-15 w-15 items-center justify-center rounded-full bg-white text-black">
+                                <img v-if="a.logoUrl && !logoFailed[a.key]" :src="a.logoUrl" :alt="a.airline"
+                                    class="h-10 w-10 object-contain" @error="logoFailed[a.key] = true" />
+                                <span v-else class="text-label-m font-bold">{{ a.airlineCode }}</span>
                             </span>
                             <div
                                 class="absolute inset-x-0 bottom-0 flex h-10 items-center justify-between bg-black/50 px-4 text-white">
-                                <span class="text-h6">{{ a.name }}</span>
-                                <span class="rounded-sm border border-white/80 px-1 text-button-s">8,2</span>
+                                <span class="truncate text-h6">{{ a.airline }}</span>
+                                <span class="shrink-0 rounded-sm border border-white/80 px-1 text-button-s">{{ a.cabin
+                                }}</span>
                             </div>
                         </div>
 
                         <div class="grid flex-1 content-between gap-x-4 gap-y-5 py-2 pr-2 md:grid-cols-3">
                             <p class="flex items-center rounded-sm bg-gray-200 px-3 py-3 text-h6">
-                                From <span class="ml-2 text-primary-500">{{ info.from }}</span>
+                                From <span class="ml-2 text-primary-500">{{ place(a.out.fromCode, a.out.fromName)
+                                }}</span>
                             </p>
                             <div class="text-center">
                                 <svg viewBox="0 0 200 40" class="mx-auto h-6 w-full max-w-48" fill="none"
@@ -176,53 +213,62 @@ const randomFilter = ref(true)
                                         stroke-dasharray="2 4" />
                                 </svg>
                                 <Icon name="icon-park-outline:airplane" size="16" class="-mt-8 mb-3 text-primary-500" />
-                                <p class="text-body-s">Trip Duration : {{ info.duration }}</p>
+                                <p class="text-body-s">Trip Duration : {{ a.out.duration }}</p>
                             </div>
                             <p class="flex items-center rounded-sm bg-gray-200 px-3 py-3 text-h6">
-                                To <span class="ml-2 text-primary-500">{{ info.to }}</span>
+                                To <span class="ml-2 text-primary-500">{{ place(a.out.toCode, a.out.toName) }}</span>
                             </p>
 
                             <div>
-                                <p class="text-body-m">{{ info.departure }} <span
-                                        class="text-body-s text-gray-400">PM</span></p>
+                                <p class="text-body-m">{{ a.out.departure }}</p>
                                 <p class="text-body-xs text-primary-400">Departure</p>
                             </div>
                             <div class="text-center">
-                                <p class="text-body-m">
-                                    {{ info.stops[0] }} <span class="text-body-s text-gray-400">PM</span>
-                                    <span class="ml-2">{{ info.stops[1] }}</span> <span
-                                        class="text-body-s text-gray-400">PM</span>
-                                </p>
-                                <p class="text-body-s text-primary-400">{{ info.stopText }}</p>
+                                <p class="text-body-m">{{ a.out.stops === 0 ? 'Non-stop' : a.out.stops + (a.out.stops
+                                    === 1 ? ' stop' : ' stops') }}</p>
+                                <p class="text-body-s text-primary-400">{{ a.out.stopText }}</p>
                             </div>
                             <div class="md:text-right">
-                                <p class="text-body-m">{{ info.landing }} <span
-                                        class="text-body-s text-gray-400">AM</span></p>
+                                <p class="text-body-m">{{ a.out.landing }}<sup v-if="a.out.dayChange"
+                                        class="ml-1 text-body-xs text-gray-400">+{{ a.out.dayChange }}</sup></p>
                                 <p class="text-body-xs text-primary-400">Landing</p>
                             </div>
 
                             <p class="flex items-center gap-2 rounded-sm bg-gray-200 px-3 py-2 text-body-xs">
-                                <Icon name="icon-park-outline:take-off" size="16" class="shrink-0" />{{ info.fromAirport
-                                }}
+                                <Icon name="icon-park-outline:take-off" size="16" class="shrink-0" />{{ a.out.fromCode
+                                }} {{ a.out.fromName }}
                             </p>
                             <p
                                 class="flex items-center justify-center gap-3 rounded-sm bg-gray-200 px-3 py-2 text-body-xs">
-                                <Icon name="icon-park-outline:time" size="16" class="shrink-0" />{{ info.viaAirport }}
+                                <Icon name="icon-park-outline:time" size="16" class="shrink-0" />{{ a.out.via }}
                             </p>
                             <p
                                 class="flex items-center justify-end gap-2 rounded-sm bg-gray-200 px-3 py-2 text-body-xs">
-                                {{ info.toAirport }}
+                                {{ a.out.toCode }} {{ a.out.toName }}
                                 <Icon name="icon-park-outline:landing" size="16" class="shrink-0" />
                             </p>
 
+                            <p v-if="a.back"
+                                class="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-sm bg-gray-100 px-3 py-2 text-body-xs md:col-span-3">
+                                <b>Return</b>
+                                <span>{{ a.back.fromCode }} {{ a.back.departure }} to {{ a.back.toCode }} {{
+                                    a.back.landing }}<sup v-if="a.back.dayChange" class="ml-1 text-gray-400">+{{
+                                        a.back.dayChange }}</sup></span>
+                                <span>{{ a.back.duration }}</span>
+                                <span>{{ a.back.stopText }}</span>
+                            </p>
+
                             <div class="flex items-center justify-between gap-3">
-                                <span class="text-h3 text-success-dark">{{ info.price }}</span>
-                                <span class="rounded-sm bg-success-light px-3 py-2 text-body-xs text-success-dark">{{
-                                    info.seats }}</span>
+                                <span class="text-h3 text-success-dark">{{ formatFlightPrice(a.price, a.currency)
+                                }}</span>
+                                <span v-if="a.seats !== null"
+                                    class="rounded-sm bg-success-light px-3 py-2 text-body-xs text-success-dark">{{
+                                        a.seats }} {{ a.seats === 1 ? 'seat' : 'seats' }} left</span>
                             </div>
                             <p class="flex items-center justify-center rounded-sm bg-gray-200 px-3 py-2 text-body-xs">{{
-                                info.carbon }}</p>
-                            <NuxtLink :to="`/flights/${i + 1}`"
+                                a.baggage }}</p>
+                            <NuxtLink
+                                :to="{ path: `/flights/${a.key}`, query: { offer: a.offerId, adults: route.query.adults, children: route.query.children } }"
                                 class="flex items-center justify-center rounded-sm bg-primary-500 py-2 text-button-xl text-white hover:bg-primary-600">
                                 View Detail
                             </NuxtLink>
@@ -230,17 +276,36 @@ const randomFilter = ref(true)
                     </article>
                 </div>
 
+                <nav v-if="!loading && !error && totalPages > 1" aria-label="Flight results pages"
+                    class="mt-12 flex flex-col items-center gap-3">
+                    <p class="text-body-xs text-gray-500">{{ rangeText }}</p>
+                    <ul class="flex flex-wrap items-center justify-center gap-2">
+                        <li>
+                            <button type="button" :disabled="page === 1"
+                                class="rounded-sm border border-gray-300 bg-white px-4 py-2 text-body-xs hover:border-primary-500 hover:text-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-300 disabled:hover:text-inherit"
+                                @click="goTo(page - 1)">Previous</button>
+                        </li>
+                        <li v-for="(item, idx) in pageItems" :key="`${item}-${idx}`">
+                            <span v-if="typeof item === 'string'" class="px-2 text-gray-400">...</span>
+                            <button v-else type="button" :aria-current="item === page ? 'page' : undefined"
+                                :class="['h-9 min-w-9 rounded-sm border px-3 text-body-xs',
+                                    item === page ? 'border-primary-500 bg-primary-500 text-white' : 'border-gray-300 bg-white hover:border-primary-500 hover:text-primary-500']"
+                                @click="goTo(item)">{{ item }}</button>
+                        </li>
+                        <li>
+                            <button type="button" :disabled="page === totalPages"
+                                class="rounded-sm border border-gray-300 bg-white px-4 py-2 text-body-xs hover:border-primary-500 hover:text-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-gray-300 disabled:hover:text-inherit"
+                                @click="goTo(page + 1)">Next</button>
+                        </li>
+                    </ul>
+                </nav>
+
                 <div class="mt-12 flex flex-col justify-between gap-4 sm:flex-row">
                     <NuxtLink to="/flights/favourites"
                         class="flex items-center justify-center gap-2 rounded-sm border border-primary-500 bg-white px-8 py-3 text-button-xxl text-primary-500 hover:bg-primary-500 hover:text-white">
                         List Your Favourite Places
                         <Icon name="icon-park-outline:like" size="18" />
                     </NuxtLink>
-                    <button type="button"
-                        class="flex items-center justify-center gap-2 rounded-sm bg-primary-500 px-8 py-3 text-button-xxl text-white hover:bg-primary-600">
-                        See More Search Results
-                        <Icon name="icon-park-outline:right" size="16" />
-                    </button>
                 </div>
             </div>
         </section>

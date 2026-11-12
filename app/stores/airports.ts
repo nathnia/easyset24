@@ -4,28 +4,32 @@ import type { Airport } from "~/utils/airports";
 
 export const useAirportsStore = defineStore("airports", {
   state: () => ({
-    list: [] as Airport[],
-    loading: false,
+    // every airport seen so far, by IATA code (to show names for codes in the URL)
+    known: {} as Record<string, Airport>,
   }),
 
   actions: {
-    // Static data, big list: load once, client side only
-    async fetchAirports() {
-      if (this.list.length || this.loading) return;
-      this.loading = true;
+    // Type-ahead search. Returns null when the request failed.
+    async search(q: string): Promise<Airport[] | null> {
+      const term = q.trim();
+      if (term.length < 2) return [];
       try {
-        const res = await $fetch("/api/iata-codes");
-        // markRaw: thousands of rows don't need deep reactivity
-        this.list = markRaw(toAirportList(res));
+        const res = await $fetch("/api/flight-airports", {
+          query: { q: term },
+        });
+        const list = toAirportList(res);
+        for (const a of list) this.known[a.code] = a;
+        return list;
       } catch {
-        // inputs still accept a typed 3-letter code
-      } finally {
-        this.loading = false;
+        return null;
       }
     },
 
-    find(code: string) {
-      return this.list.find((a) => a.code === code);
+    // Resolve one code ("ARN") to its airport, using the search endpoint
+    async lookup(code: string) {
+      if (this.known[code]) return this.known[code];
+      const list = await this.search(code);
+      return list?.find((a) => a.code === code);
     },
   },
 });
