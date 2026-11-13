@@ -31,9 +31,9 @@ useLazyAsyncData('facilities', async () => {
 }, { server: false })
 const showAllFacilities = ref(false)
 const shownFacilities = computed(() => showAllFacilities.value ? facilities.value : facilities.value.slice(0, 6))
-// Stars and Guests Rating are real. The other groups have no LiteAPI data and stay as decoration.
+// Only Stars and Guests Rating are real (LiteAPI data). The decoration groups are removed.
 const otherGroups = filterGroups
-    .filter((g) => g.key !== 'popular')
+    .filter((g) => g.key === 'rating' || g.key === 'stars')
     .map((g) => g.key === 'rating' ? { ...g, options: ['All', 'Outstanding 9+', 'Very Good 8+', 'Good 7+'] } : g)
 
 const mapZoom = 11
@@ -45,14 +45,8 @@ const mapTiles = [618, 619, 620].flatMap(y => [1091, 1092, 1093].map(x => ({
 
 
 const selected = reactive<Record<string, any>>({
-    popular: ['Free Cancellation'],
-    room: ['See View'],
     rating: 'All',
-    bed: 'Baby Cots',
-    leisure: ['Bar'],
-    sustain: '',
     stars: '',
-    distance: 'Less Than 15 Km',
 })
 
 const priceLimit = ref(500)
@@ -104,12 +98,45 @@ const starsWanted = computed(() => parseInt(selected.stars) || 0)
 const ratingWanted = computed(() => Number(/(\d+)\+/.exec(String(selected.rating))?.[1]) || 0)
 const filtersActive = computed(() => priceActive.value || !!starsWanted.value || !!ratingWanted.value || facilityIds.value.length > 0)
 
-const shown = computed(() => hotels.value.filter((h) => {
+// ---- sort (on the loaded hotels only)
+const sortOptions = [
+    { key: 'top', label: 'Our Top Picks For Families' },
+    { key: 'priceAsc', label: 'Price: Low To High' },
+    { key: 'priceDesc', label: 'Price: High To Low' },
+    { key: 'rating', label: 'Guest Rating' },
+]
+const sortBy = ref('top')
+const sortOpen = ref(false)
+const sortLabel = computed(() => sortOptions.find((o) => o.key === sortBy.value)!.label)
+function pickSort(key: string) {
+    sortBy.value = key
+    sortOpen.value = false
+}
+function closeSort(e: FocusEvent) {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) sortOpen.value = false
+}
+
+const filtered = computed(() => hotels.value.filter((h) => {
     if (starsWanted.value && Math.floor(h.starCount) !== starsWanted.value) return false
     if (ratingWanted.value && h.score < ratingWanted.value) return false
     if (priceActive.value && (h.amount === null || h.amount < range.min || h.amount > range.max)) return false
     return true
 }))
+
+const shown = computed(() => {
+    const list = [...filtered.value]
+    if (sortBy.value === 'rating') return list.sort((a, b) => b.score - a.score)
+    if (sortBy.value === 'priceAsc' || sortBy.value === 'priceDesc') {
+        const dir = sortBy.value === 'priceAsc' ? 1 : -1
+        // hotels without a price go last
+        return list.sort((a, b) => {
+            if (a.amount === null) return b.amount === null ? 0 : 1
+            if (b.amount === null) return -1
+            return (a.amount - b.amount) * dir
+        })
+    }
+    return list
+})
 
 function clearFilters() {
     range.min = 0
@@ -139,11 +166,23 @@ function clearFilters() {
             </div>
 
             <div class="flex flex-col">
-                <button type="button"
-                    class="flex w-full max-w-62.5 items-center justify-between rounded-sm border border-gray-300 bg-white px-3 py-2 text-left">
-                    <span class="text-body-xs"><b class="text-label-m">Sort By</b> : Our Top Picks For Families</span>
-                    <Icon name="icon-park-outline:sort-two" size="18" />
-                </button>
+                <div class="relative w-full max-w-62.5" @focusout="closeSort">
+                    <button type="button" :aria-expanded="sortOpen"
+                        class="flex w-full items-center justify-between rounded-sm border border-gray-300 bg-white px-3 py-2 text-left"
+                        @click="sortOpen = !sortOpen">
+                        <span class="text-body-xs"><b class="text-label-m">Sort By</b> : {{ sortLabel }}</span>
+                        <Icon name="icon-park-outline:sort-two" size="18" />
+                    </button>
+                    <ul v-if="sortOpen"
+                        class="absolute left-0 top-full z-20 mt-1 w-full rounded-sm border border-gray-300 bg-white py-1 shadow-md">
+                        <li v-for="o in sortOptions" :key="o.key">
+                            <button type="button" class="w-full px-3 py-2 text-left text-body-xs hover:bg-gray-100"
+                                :class="sortBy === o.key ? 'font-bold text-primary-500' : ''" @click="pickSort(o.key)">
+                                {{ o.label }}
+                            </button>
+                        </li>
+                    </ul>
+                </div>
                 <h2 class="mt-5 text-h4 text-gray-500">{{ city }}</h2>
                 <p class="mt-1 text-body-xxs">{{ shown.length }}{{ hasMore ? '+' : '' }} Properties Found</p>
                 <p class="mt-4 max-w-xl text-body-s text-gray-500">
@@ -163,7 +202,7 @@ function clearFilters() {
                     <button v-if="filtersActive" type="button" class="text-body-xxs text-primary-500 underline"
                         @click="clearFilters">Clear all</button>
                 </div>
-                <p class="mt-4 text-body-s">Your Budget For Per Night</p>
+                <p class="mt-4 text-body-s">Your Budget For The Stay</p>
 
                 <div class="relative mt-3 h-6 w-full">
                     <div
@@ -224,10 +263,6 @@ function clearFilters() {
                             </label>
                         </li>
                     </ul>
-                    <button type="button" class="mt-1 flex items-center gap-1 text-body-xxs text-primary-500">
-                        Show More
-                        <Icon name="icon-park-outline:down" size="12" />
-                    </button>
                 </div>
             </aside>
 

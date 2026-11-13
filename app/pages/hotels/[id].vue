@@ -49,6 +49,19 @@ watch(activeTab, (t) => {
     if (t === 'Rooms & Beds' || t === 'Info & Prices') store.fetchRooms(String(route.params.id), stay.value)
 })
 
+// Book Now: open the Rooms tab and bring the list into view. Exactly one room -> go straight to payment.
+const tabsEl = ref<HTMLElement | null>(null)
+async function bookNow() {
+    activeTab.value = 'Rooms & Beds'
+    await store.fetchRooms(String(route.params.id), stay.value)
+    if (rooms.value.length === 1 && !roomsError.value) {
+        await navigateTo(bookLink(rooms.value[0]!.offerId))
+        return
+    }
+    await nextTick()
+    tabsEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 const priceOptions = computed(() => {
     const best = new Map<string, (typeof rooms.value)[number]>()
     for (const o of rooms.value) {
@@ -117,7 +130,7 @@ const scroll = (dir: 1 | -1) =>
                 </button>
             </div>
 
-            <div>
+            <div ref="tabsEl" class="scroll-mt-24">
                 <div class="flex flex-wrap">
                     <button v-for="tab in tabs" :key="tab" type="button"
                         class="rounded-t-md px-6 py-3 text-label-m text-primary-500 transition-colors md:px-10"
@@ -152,7 +165,7 @@ const scroll = (dir: 1 | -1) =>
                             <div class="flex flex-col gap-3">
                                 <p class="text-body-xs">
                                     <b class="text-label-m">{{ stay.adults }} {{ stay.adults === 1 ? 'Adult' : 'Adults'
-                                        }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
+                                    }} ,{{ stay.nights }} {{ stay.nights === 1 ? 'Night' : 'Nights' }}</b> | Two
                                     Rooms ,Double Bed
                                 </p>
                                 <p class="flex items-center gap-2 text-body-xs">
@@ -170,9 +183,9 @@ const scroll = (dir: 1 | -1) =>
                                         <Icon name="icon-park-outline:like" size="18"
                                             :class="liked ? 'text-error-light' : 'text-black'" />
                                     </button>
-                                    <button type="button"
-                                        class="flex h-10 flex-1 items-center justify-center rounded-sm bg-primary-500 px-8 text-button-l text-white hover:bg-primary-600 md:w-56 md:flex-none"
-                                        @click="activeTab = 'Rooms & Beds'">
+                                    <button type="button" :disabled="roomsLoading"
+                                        class="flex h-10 flex-1 items-center justify-center rounded-sm bg-primary-500 px-8 text-button-l text-white hover:bg-primary-600 disabled:opacity-60 md:w-56 md:flex-none"
+                                        @click="bookNow">
                                         Book Now
                                     </button>
                                 </div>
@@ -183,7 +196,7 @@ const scroll = (dir: 1 | -1) =>
                     <template v-else-if="activeTab === 'Info & Prices'">
                         <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading prices...</p>
                         <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
-                            }}</p>
+                        }}</p>
                         <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
                             No prices available for these dates.
                         </p>
@@ -218,7 +231,7 @@ const scroll = (dir: 1 | -1) =>
                                         class="flex items-center justify-between gap-4 border-b border-gray-300 pb-3">
                                         <span class="text-gray-500">{{ opt.board }} | {{ cancelText(opt) }}</span>
                                         <b class="shrink-0 text-label-m text-success-dark">{{ formatPrice(opt.price)
-                                        }}</b>
+                                            }}</b>
                                     </li>
                                 </ul>
                             </div>
@@ -228,7 +241,7 @@ const scroll = (dir: 1 | -1) =>
                     <template v-else-if="activeTab === 'Rooms & Beds'">
                         <p v-if="roomsLoading" class="py-10 text-center text-body-s text-gray-500">Loading rooms...</p>
                         <p v-else-if="roomsError" class="py-10 text-center text-body-s text-error-light">{{ roomsError
-                            }}</p>
+                        }}</p>
                         <p v-else-if="!rooms.length" class="py-10 text-center text-body-s text-gray-500">
                             No rooms available for these dates.
                         </p>
@@ -339,7 +352,7 @@ const scroll = (dir: 1 | -1) =>
                             <Icon v-if="review.country" :name="`circle-flags:${review.country}`" size="16" />
                             {{ review.name }}
                             <span v-if="review.score" class="ml-auto text-caption-s text-gray-500">{{ review.score
-                                }}</span>
+                            }}</span>
                         </p>
                         <p class="line-clamp-4 text-body-xs">"{{ review.text }}"</p>
                         <NuxtLink to="#" class="text-caption-s text-primary-500">Read More ...</NuxtLink>
