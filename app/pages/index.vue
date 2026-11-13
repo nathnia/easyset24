@@ -38,6 +38,7 @@ useLazyAsyncData('home-cities', async () => {
 const destination = ref('')
 const checkin = ref('')
 const checkout = ref('')
+const adults = ref(2)
 const today = new Date().toISOString().slice(0, 10)
 
 // the date boxes look like text boxes until you click them
@@ -51,6 +52,7 @@ function searchHotels() {
     const query: Record<string, string> = { cityName: destination.value.trim() }
     if (checkin.value) query.checkin = checkin.value
     if (checkout.value) query.checkout = checkout.value
+    query.adults = String(adults.value)
     navigateTo({ path: '/hotels/search', query })
 }
 
@@ -153,7 +155,10 @@ const inspirationImage = 'https://substackcdn.com/image/fetch/$s_!N2rG!,w_1456,c
                     </label>
                     <label class="flex flex-1 items-center gap-4 border-b border-gray-300 px-4 py-3 md:border-b-0">
                         <Icon name="icon-park-outline:people-plus" size="24" class="shrink-0 text-primary-400" />
-                        <span class="text-caption-s">Adults 2</span>
+                        <select v-model.number="adults" aria-label="Adults"
+                            class="bg-transparent text-caption-s outline-none">
+                            <option v-for="n in 9" :key="n" :value="n">Adults {{ n }}</option>
+                        </select>
                         <span class="text-caption-s">Children 3</span>
                         <span class="text-caption-s">Room</span>
                         <Icon name="icon-park-outline:down" size="20" class="ml-auto" />

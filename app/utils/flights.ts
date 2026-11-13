@@ -284,6 +284,14 @@ export function formatDate(iso: string) {
   });
 }
 
+// Wait between two flights, from the airport's own clock (same airport = same zone)
+function gapText(arrive?: string, depart?: string) {
+  const mins = Math.round(
+    (Date.parse(depart ?? "") - Date.parse(arrive ?? "")) / 60000,
+  );
+  return Number.isFinite(mins) && mins > 0 ? formatMinutes(mins) : "";
+}
+
 function detailLeg(
   journey: any,
   dir: "OUTBOUND" | "INBOUND",
@@ -329,7 +337,7 @@ function detailLeg(
     layovers: segments.slice(0, -1).map((s, i) => ({
       code: s.toCode,
       name: s.toName,
-      duration: "",
+      duration: gapText(segs[i]?.arrivalTime, segs[i + 1]?.departureTime),
       changeAirport: s.toCode !== segments[i + 1]!.fromCode,
       overnight: false,
     })),
