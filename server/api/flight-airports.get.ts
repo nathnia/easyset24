@@ -8,5 +8,10 @@ export default defineEventHandler((event) => {
       statusMessage: "q must be at least 2 characters",
     });
   }
-  return liteapi(event, "/data/flights/airports", params, { cache: true });
+  return liteapi(
+    event,
+    "/data/flights/airports",
+    { q: params.q!.trim() },
+    { cache: true },
+  );
 });

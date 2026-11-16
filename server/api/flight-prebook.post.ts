@@ -1,13 +1,10 @@
-// POST /flights/prebooks: reserve the offer with the airline + get the Stripe payment keys
 import { liteapi } from "../utils/liteapi-proxy";
+import { DATE, text } from "../utils/validate";
 
-const text = (v: unknown, max = 100) =>
-  typeof v === "string" ? v.trim().slice(0, max) : "";
 const digits = (v: unknown, max: number) =>
   text(v, 40).replace(/\D/g, "").slice(0, max);
 const bad = (message: string) =>
   createError({ statusCode: 400, statusMessage: message });
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ISO2 = /^[A-Za-z]{2}$/;
 
 export default defineEventHandler(async (event) => {

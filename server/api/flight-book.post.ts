@@ -1,13 +1,10 @@
-// POST /flights/bookings: confirm the flight after the payment SDK took the money
 import { liteapi } from "../utils/liteapi-proxy";
-
-const text = (v: unknown, max = 200) =>
-  typeof v === "string" ? v.trim().slice(0, max) : "";
+import { text } from "../utils/validate";
 
 export default defineEventHandler(async (event) => {
   const body = (await readBody(event)) ?? {};
-  const prebookId = text(body.prebookId);
-  const transactionId = text(body.transactionId);
+  const prebookId = text(body.prebookId, 200);
+  const transactionId = text(body.transactionId, 200);
 
   if (!prebookId || !transactionId) {
     throw createError({

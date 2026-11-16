@@ -1,9 +1,5 @@
-// POST /rates/book: confirm the booking after the payment SDK took the money
 import { liteapi, BOOK_URL } from "../utils/liteapi-proxy";
-
-const PER_ROOM = 2;
-const text = (v: unknown, max = 100) =>
-  typeof v === "string" ? v.trim().slice(0, max) : "";
+import { roomCount, text } from "../utils/validate";
 
 export default defineEventHandler(async (event) => {
   const body = (await readBody(event)) ?? {};
@@ -35,8 +31,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // Same room split as rates (5 adults -> 3 rooms). Main guest is listed on every room.
-  const rooms = Math.ceil(adults / PER_ROOM);
+  const rooms = roomCount(adults);
   const guests = Array.from({ length: rooms }, (_, i) => ({
     occupancyNumber: i + 1,
     firstName,

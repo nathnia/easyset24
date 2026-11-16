@@ -1,7 +1,8 @@
-// PUT /bookings/{id}: cancel a booking
+import { requireUser } from "../utils/auth";
 import { liteapi, BOOK_URL } from "../utils/liteapi-proxy";
 
 export default defineEventHandler(async (event) => {
+  requireUser(event);
   const body = (await readBody(event)) ?? {};
   const id = String(body.id ?? "");
   if (!/^[\w-]{3,64}$/.test(id)) {

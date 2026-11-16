@@ -51,6 +51,7 @@ export async function liteapi(
       headers: { "X-API-Key": liteapiKey, accept: "application/json" },
       query,
       body: options.body,
+      timeout: 30000,
     });
     if (options.cache)
       setHeader(event, "cache-control", "public, max-age=86400");

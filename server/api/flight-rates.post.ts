@@ -1,7 +1,7 @@
 import { liteapi } from "../utils/liteapi-proxy";
+import { DATE } from "../utils/validate";
 
 const IATA = /^[A-Za-z]{3}$/;
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const CABINS = ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"];
 
 const bad = (message: string) =>

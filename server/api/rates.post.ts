@@ -1,10 +1,8 @@
-// POST /hotels/rates: room offers for one hotel
 import { liteapi } from "../utils/liteapi-proxy";
+import { DATE, occupancies } from "../utils/validate";
 
 const CURRENCY = "USD";
 const NATIONALITY = "ID";
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const PER_ROOM = 2;
 
 export default defineEventHandler(async (event) => {
   const { hotelId, checkin, checkout, adults } = (await readBody(event)) ?? {};
@@ -29,12 +27,6 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // Same room split as min-rates (5 adults -> 2 + 2 + 1)
-  const rooms = Math.ceil(guests / PER_ROOM);
-  const occupancies = Array.from({ length: rooms }, (_, i) => ({
-    adults: i < rooms - 1 ? PER_ROOM : guests - PER_ROOM * (rooms - 1),
-  }));
-
   return liteapi(
     event,
     "/hotels/rates",
@@ -42,7 +34,7 @@ export default defineEventHandler(async (event) => {
     {
       body: {
         hotelIds: [hotelId],
-        occupancies,
+        occupancies: occupancies(guests),
         checkin,
         checkout,
         currency: CURRENCY,
