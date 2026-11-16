@@ -17,12 +17,16 @@ onBeforeUnmount(() => window.removeEventListener('scroll', onScroll))
             :class="scrolled ? 'shadow-md' : ''">
             <div class="page-container flex items-center justify-between gap-3 py-5 md:gap-4">
                 <NuxtLink to="/" class="shrink-0">
-                    <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
+                    <img :src="logo" alt="EasySet 24" class="h-11 text-label-m text-primary-500" />
                 </NuxtLink>
 
                 <div class="flex items-center gap-2.5 md:gap-3">
-                    <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
-                    <Icon name="icon-park-outline:help" size="18" class="shrink-0 text-primary-500" />
+                    <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center">
+                        <Icon name="circle-flags:uk" size="18" aria-label="English" />
+                    </span>
+                    <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center">
+                        <Icon name="icon-park-outline:help" size="20" class="text-primary-500" />
+                    </span>
                     <AccountMenu />
                 </div>
             </div>

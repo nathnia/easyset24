@@ -116,8 +116,10 @@ function openPicker(e: Event) {
     (e.target as HTMLInputElement).showPicker?.()
 }
 
-const field = 'relative flex h-[50px] items-center gap-3 border border-gray-300 bg-white px-3 text-body-s md:-ml-px md:first:ml-0'
-const selectBase = 'appearance-none bg-transparent outline-none'
+// same look as the home hero search: one bar, cells split by dividers
+const cell = 'relative flex items-center gap-4 border-b border-gray-300 px-4 py-3 text-caption-s md:border-b-0'
+const divider = 'md:border-r'
+const selectBase = 'appearance-none bg-transparent text-caption-s outline-none'
 const select = `w-full ${selectBase}`
 </script>
 
@@ -126,90 +128,79 @@ const select = `w-full ${selectBase}`
         <h1 class="text-h4 text-primary-500">{{ c.title }}</h1>
         <p class="mt-1 text-body-s text-primary-500">{{ c.subtitle }}</p>
 
-        <form class="mt-8 flex flex-col gap-3 md:flex-row md:items-end md:gap-0" @submit.prevent="search">
-            <div class="md:flex-2">
-                <label class="mb-1 block text-label-m">{{ c.labels[0] }}</label>
-                <div :class="field">
-                    <Icon :name="c.icon" size="22" class="shrink-0 text-gray-500" />
-                    <template v-if="type === 'flight'">
-                        <AirportInput v-model="fromCode" label="From airport" placeholder="From" />
-                        <span class="shrink-0">-</span>
-                        <AirportInput v-model="toCode" label="To airport" placeholder="To" />
-                    </template>
-                    <template v-else>
-                        <input v-model="first" type="text" list="city-options" class="w-full outline-none" />
-                        <datalist id="city-options">
-                            <option v-for="ci in cities" :key="ci" :value="ci" />
-                        </datalist>
-                    </template>
-                </div>
+        <form class="mt-8 flex flex-col overflow-hidden rounded-sm border border-gray-300 bg-white md:flex-row"
+            @submit.prevent="search">
+            <div :class="[cell, divider, 'md:flex-2']">
+                <Icon :name="c.icon" size="24" class="shrink-0 text-primary-400" />
+                <template v-if="type === 'flight'">
+                    <AirportInput v-model="fromCode" label="From airport" placeholder="From" />
+                    <span class="shrink-0">-</span>
+                    <AirportInput v-model="toCode" label="To airport" placeholder="To" />
+                </template>
+                <template v-else>
+                    <input v-model="first" type="text" list="city-options" :aria-label="c.labels[0]"
+                        class="w-full text-caption-s outline-none" />
+                    <datalist id="city-options">
+                        <option v-for="ci in cities" :key="ci" :value="ci" />
+                    </datalist>
+                </template>
             </div>
 
-            <div class="md:flex-[1.4]">
-                <label class="mb-1 block text-label-m">{{ c.labels[1] }}</label>
-                <div :class="field">
-                    <select v-model="second" :class="select">
-                        <option v-for="o in c.secondOptions" :key="o">{{ o }}</option>
-                    </select>
-                    <Icon name="icon-park-outline:sort-two" size="20" class="shrink-0 text-primary-400" />
-                </div>
+            <div :class="[cell, divider, 'md:flex-[1.4]']">
+                <select v-model="second" :aria-label="c.labels[1]" :class="select">
+                    <option v-for="o in c.secondOptions" :key="o">{{ o }}</option>
+                </select>
+                <Icon name="icon-park-outline:sort-two" size="20" class="shrink-0 text-primary-400" />
             </div>
 
-            <div class="md:flex-[2.6]">
-                <label class="mb-1 block text-label-m">{{ c.labels[2] }}</label>
-                <div :class="field">
-                    <Icon name="icon-park-outline:user" size="22" class="shrink-0 text-primary-400" />
-                    <select v-if="type === 'hotel'" v-model.number="adults" :class="[select, 'w-28']">
-                        <option v-for="n in 6" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}</option>
+            <div :class="[cell, divider, 'md:flex-[2.6]']">
+                <Icon name="icon-park-outline:people-plus" size="24" class="shrink-0 text-primary-400" />
+                <select v-if="type === 'hotel'" v-model.number="adults" aria-label="Adults" :class="[select, 'w-28']">
+                    <option v-for="n in 6" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}</option>
+                </select>
+                <template v-else>
+                    <select v-model.number="flightAdults" aria-label="Adults" :class="[selectBase, 'w-18 shrink-0']">
+                        <option v-for="n in 9" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}
+                        </option>
                     </select>
-                    <template v-else>
-                        <select v-model.number="flightAdults" aria-label="Adults"
-                            :class="[selectBase, 'w-18 shrink-0']">
-                            <option v-for="n in 9" :key="n" :value="n">{{ n }} {{ n === 1 ? 'Adult' : 'Adults' }}
-                            </option>
-                        </select>
-                        <span class="-mx-1 shrink-0">-</span>
-                        <select v-model.number="flightChildren" aria-label="Children"
-                            :class="[selectBase, 'w-22 shrink-0']">
-                            <option v-for="n in 10" :key="n" :value="n - 1">{{ n - 1 }} {{ n === 2 ? 'Child' :
-                                'Children' }}</option>
-                        </select>
-                    </template>
-                    <select v-model="third"
-                        :class="type === 'hotel' ? [select, 'ml-2'] : [selectBase, 'ml-auto w-28 shrink-0']">
-                        <option v-for="o in c.thirdOptions" :key="o">{{ o }}</option>
+                    <span class="-mx-1 shrink-0">-</span>
+                    <select v-model.number="flightChildren" aria-label="Children"
+                        :class="[selectBase, 'w-22 shrink-0']">
+                        <option v-for="n in 10" :key="n" :value="n - 1">{{ n - 1 }} {{ n === 2 ? 'Child' :
+                            'Children' }}</option>
                     </select>
-                    <Icon name="icon-park-outline:sort-two" size="20" class="shrink-0 text-primary-400" />
-                </div>
+                </template>
+                <select v-model="third" :aria-label="c.labels[2]"
+                    :class="type === 'hotel' ? [select, 'ml-2'] : [selectBase, 'ml-auto w-28 shrink-0']">
+                    <option v-for="o in c.thirdOptions" :key="o">{{ o }}</option>
+                </select>
+                <Icon name="icon-park-outline:sort-two" size="20" class="shrink-0 text-primary-400" />
             </div>
 
-            <div class="md:flex-2">
-                <label class="mb-1 block text-label-m">{{ c.labels[3] }}</label>
-                <div :class="field">
-                    <Icon name="icon-park-outline:calendar" size="22" class="shrink-0 text-primary-400" />
-                    <template v-if="type === 'hotel'">
-                        <span class="whitespace-nowrap">{{ fmt(checkin) }} - {{ fmt(checkout) }}</span>
-                        <input v-model="checkin" type="date" :min="today" required aria-label="Check in"
-                            class="absolute inset-y-0 left-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
-                        <input v-model="checkout" type="date" :min="checkin" required aria-label="Check out"
-                            class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
-                    </template>
-                    <template v-else>
-                        <span class="whitespace-nowrap">{{ fmt(departDate) }}<template v-if="second !== 'One Way'"> - {{
-                                fmt(returnDate) }}</template></span>
-                        <input v-model="departDate" type="date" :min="today" :max="maxDate" required
-                            aria-label="Departure date"
-                            :class="['absolute inset-y-0 left-0 cursor-pointer opacity-0', second === 'One Way' ? 'w-full' : 'w-1/2']"
-                            @click="openPicker" />
-                        <input v-if="second !== 'One Way'" v-model="returnDate" type="date" :min="departDate"
-                            :max="maxDate" required aria-label="Return date"
-                            class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
-                    </template>
-                </div>
+            <div :class="[cell, 'md:flex-2']">
+                <Icon name="icon-park-outline:calendar" size="24" class="shrink-0 text-primary-400" />
+                <template v-if="type === 'hotel'">
+                    <span class="whitespace-nowrap">{{ fmt(checkin) }} - {{ fmt(checkout) }}</span>
+                    <input v-model="checkin" type="date" :min="today" required aria-label="Check in"
+                        class="absolute inset-y-0 left-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                    <input v-model="checkout" type="date" :min="checkin" required aria-label="Check out"
+                        class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                </template>
+                <template v-else>
+                    <span class="whitespace-nowrap">{{ fmt(departDate) }}<template v-if="second !== 'One Way'"> - {{
+                        fmt(returnDate) }}</template></span>
+                    <input v-model="departDate" type="date" :min="today" :max="maxDate" required
+                        aria-label="Departure date"
+                        :class="['absolute inset-y-0 left-0 cursor-pointer opacity-0', second === 'One Way' ? 'w-full' : 'w-1/2']"
+                        @click="openPicker" />
+                    <input v-if="second !== 'One Way'" v-model="returnDate" type="date" :min="departDate" :max="maxDate"
+                        required aria-label="Return date"
+                        class="absolute inset-y-0 right-0 w-1/2 cursor-pointer opacity-0" @click="openPicker" />
+                </template>
             </div>
 
             <button type="submit"
-                class="h-12.5 bg-primary-500 px-10 text-button-xxl text-white hover:bg-primary-600 md:flex-[1.2]">
+                class="bg-primary-500 px-10 py-3 text-button-xxl text-white hover:bg-primary-600 md:flex-[1.2]">
                 {{ c.button }}
             </button>
         </form>

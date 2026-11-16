@@ -27,6 +27,7 @@ const active = computed(() => {
     return ''
 })
 
+const iconBox = 'inline-flex h-6 w-6 shrink-0 items-center justify-center'
 const tabBase = 'w-24 shrink-0 rounded-full border py-1.5 text-center text-caption-s md:w-[78px] xl:w-[90px]'
 const tabActive = 'border-primary-500 bg-primary-500 text-white'
 const authBtn =
@@ -39,7 +40,7 @@ const authBtn =
             :class="scrolled ? 'shadow-md' : ''">
             <div class="page-container flex items-center gap-3 py-5 md:gap-4">
                 <NuxtLink to="/" class="shrink-0">
-                    <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
+                    <img :src="logo" alt="EasySet 24" class="h-11 text-label-m text-primary-500" />
                 </NuxtLink>
 
                 <template v-if="!isLoggedIn">
@@ -49,30 +50,34 @@ const authBtn =
                     <Icon name="circle-flags:uk" size="24" class="shrink-0" aria-label="English" />
                 </template>
 
-                <div class="relative hidden flex-1 md:block">
+                <div class="relative hidden flex-1 md:block md:mx-4 xl:mx-16">
                     <input type="text" placeholder="Search"
-                        class="w-full rounded-md border border-gray-300 bg-white px-4 py-2 text-caption-s outline-none placeholder:text-gray-400 focus:border-primary-400" />
-                    <Icon name="icon-park-outline:search" size="16"
+                        class="w-full rounded-sm border border-gray-300 bg-white px-4 py-2.5 text-caption-s outline-none placeholder:text-gray-400 focus:border-primary-400" />
+                    <Icon name="icon-park-outline:search" size="18"
                         class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
 
-                <div v-if="!isLoggedIn" class="ml-auto flex gap-3 md:ml-4">
+                <div v-if="!isLoggedIn" class="ml-auto flex gap-3 md:ml-0">
                     <NuxtLink to="/login" :class="authBtn">Sign In</NuxtLink>
                     <NuxtLink to="/register" :class="authBtn">Register</NuxtLink>
                 </div>
 
-                <div v-else class="ml-auto flex items-center gap-2.5 md:ml-4 md:gap-3">
-                    <Icon name="circle-flags:uk" size="18" class="shrink-0" aria-label="English" />
-                    <Icon name="icon-park-outline:dollar" size="18" class="shrink-0 text-primary-500"
-                        aria-label="Currency" />
-                    <NuxtLink to="/help" aria-label="Help" class="shrink-0">
-                        <Icon name="icon-park-outline:help" size="18" class="text-primary-500" />
+                <div v-else class="ml-auto flex items-center gap-2.5 md:ml-0 md:gap-3">
+                    <span :class="iconBox">
+                        <Icon name="circle-flags:uk" size="18" aria-label="English" />
+                    </span>
+                    <span :class="iconBox">
+                        <Icon name="icon-park-outline:dollar" size="20" class="text-primary-500"
+                            aria-label="Currency" />
+                    </span>
+                    <NuxtLink to="/help" aria-label="Help" :class="iconBox">
+                        <Icon name="icon-park-outline:help" size="20" class="text-primary-500" />
                     </NuxtLink>
-                    <NuxtLink to="/favourites" aria-label="Favourites" class="shrink-0">
-                        <Icon name="icon-park-outline:like" size="18" class="text-primary-500" />
+                    <NuxtLink to="/favourites" aria-label="Favourites" :class="iconBox">
+                        <Icon name="icon-park-outline:like" size="20" class="text-primary-500" />
                     </NuxtLink>
-                    <NuxtLink to="/customer-service" aria-label="Customer service" class="shrink-0">
-                        <Icon name="icon-park-outline:phone-call" size="18" class="text-primary-500" />
+                    <NuxtLink to="/customer-service" aria-label="Customer service" :class="iconBox">
+                        <Icon name="icon-park-outline:phone-call" size="20" class="text-primary-500" />
                     </NuxtLink>
                     <AccountMenu />
                 </div>

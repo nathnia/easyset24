@@ -7,7 +7,7 @@ const logo = '/images/logo.svg'
         <header class="border-b border-gray-300 bg-background">
             <div class="page-container flex items-center justify-between py-3">
                 <NuxtLink to="/" class="shrink-0">
-                    <img :src="logo" alt="EasySet 24" class="h-10 text-label-m text-primary-500" />
+                    <img :src="logo" alt="EasySet 24" class="h-11 text-label-m text-primary-500" />
                 </NuxtLink>
                 <div class="flex items-center gap-4">
                     <Icon name="circle-flags:uk" size="24" aria-label="English" />

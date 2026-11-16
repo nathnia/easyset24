@@ -13,7 +13,6 @@ const items = [
     { label: 'Support', to: '/customer-service', icon: 'icon-park-outline:headset-one' },
 ]
 
-// '/profile' must not stay highlighted on '/profile/bookings'
 const isActive = (to: string) =>
     to === '/profile' ? route.path === '/profile' : route.path.startsWith(to)
 
@@ -36,7 +35,7 @@ function onSignOut() {
     <div ref="root" class="relative">
         <button type="button" class="flex items-center gap-2" aria-haspopup="menu" :aria-expanded="open"
             @click="open = !open">
-            <img :src="user?.avatar" alt="" class="h-8 w-8 shrink-0 rounded-full object-cover" />
+            <img :src="user?.avatar" alt="" class="h-9 w-9 shrink-0 rounded-full object-cover" />
             <span class="hidden text-left leading-tight sm:block">
                 <span class="block text-label-m text-primary-500">Your Account</span>
                 <span class="block text-caption-s text-primary-500">{{ user?.name }}</span>
