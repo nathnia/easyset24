@@ -1,8 +1,5 @@
-// Airports from LiteAPI GET /data/flights/airports?q=
-// Response: { data: [{ airports: [{ iata, name, city, country, ... }], count }] }
-
 export interface Airport {
-  code: string; // 3-letter IATA code
+  code: string;
   name: string;
   city: string;
   country: string;
@@ -21,7 +18,6 @@ export function toAirport(a: any): Airport | null {
   };
 }
 
-// The API wraps airports in result sets: data[].airports[]
 export function toAirportList(res: any): Airport[] {
   const data: unknown[] = Array.isArray(res) ? res : (res?.data ?? []);
   const rows: unknown[] = [];
@@ -36,7 +32,3 @@ export function toAirportList(res: any): Airport[] {
   }
   return [...byCode.values()];
 }
-
-// "JFK - New York"
-export const airportLabel = (a: Airport) =>
-  [a.code, a.city || a.name].filter(Boolean).join(" - ");

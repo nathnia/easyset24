@@ -1,11 +1,57 @@
-// Helpers for the checkout flow: prebook -> pay -> book
+interface RawPolicies {
+  refundableTag?: string;
+  cancelPolicyInfos?: { cancelTime?: unknown }[];
+  hotelRemarks?: unknown;
+}
+interface RawRate {
+  name?: string;
+  boardName?: string;
+  cancellationPolicies?: RawPolicies;
+}
+interface RawPrebook {
+  prebookId?: string;
+  transactionId?: string;
+  secretKey?: string;
+  currency?: string;
+  price?: unknown;
+  suggestedSellingPrice?: unknown;
+  priceDifferencePercent?: number | string;
+  cancellationChanged?: boolean;
+  boardChanged?: boolean;
+  cancellationPolicies?: RawPolicies;
+  roomTypes?: { rates?: RawRate[] }[];
+}
+interface RawBookedRoom {
+  adults?: number | string;
+  children?: number | string;
+  boardName?: string;
+  roomType?: { name?: string };
+}
+interface RawBooking {
+  bookingId?: string | number;
+  status?: string;
+  hotelConfirmationCode?: string;
+  hotel?: { hotelId?: string; name?: string };
+  checkin?: string;
+  checkout?: string;
+  bookedRooms?: RawBookedRoom[];
+  price?: unknown;
+  currency?: string;
+  cancellationPolicies?: RawPolicies;
+  holder?: { firstName?: string; lastName?: string; email?: string };
+}
+interface RawCancelInfo {
+  cancellation_fee?: unknown;
+  cancellationFee?: unknown;
+  refund_amount?: unknown;
+  refundAmount?: unknown;
+}
 
-const num = (v: any): number | undefined =>
-  typeof v === "number"
-    ? v
-    : typeof v?.amount === "number"
-      ? v.amount
-      : undefined;
+const num = (v: unknown): number | undefined => {
+  if (typeof v === "number") return v;
+  const a = (v as { amount?: unknown } | null)?.amount;
+  return typeof a === "number" ? a : undefined;
+};
 
 const DAY = 86400000;
 
@@ -29,7 +75,7 @@ export function formatDate(iso?: string) {
 export const nightsBetween = (a?: string, b?: string) =>
   a && b ? Math.max(Math.round((Date.parse(b) - Date.parse(a)) / DAY), 0) : 0;
 
-function cancelInfo(c: any) {
+function cancelInfo(c?: RawPolicies) {
   const time = c?.cancelPolicyInfos?.[0]?.cancelTime;
   return {
     refundable: c?.refundableTag === "RFN",
@@ -44,10 +90,9 @@ export const cancelText = (o: { refundable: boolean; cancelUntil: string }) =>
       ? "Free cancellation until " + formatDate(o.cancelUntil)
       : "Free cancellation";
 
-// POST /rates/prebook response
-export function toPrebook(res: any) {
-  const d = res?.data ?? {};
-  const rates: any[] = d.roomTypes?.[0]?.rates ?? [];
+export function toPrebook(res: unknown) {
+  const d: RawPrebook = (res as { data?: RawPrebook } | null)?.data ?? {};
+  const rates = d.roomTypes?.[0]?.rates ?? [];
   const first = rates[0];
   return {
     prebookId: String(d.prebookId ?? ""),
@@ -66,11 +111,10 @@ export function toPrebook(res: any) {
 }
 export type Prebook = ReturnType<typeof toPrebook>;
 
-// POST /rates/book response
-export function toBooking(res: any) {
-  const d = res?.data ?? {};
-  const rooms: any[] = d.bookedRooms ?? [];
-  const sum = (k: string) =>
+export function toBooking(res: unknown) {
+  const d: RawBooking = (res as { data?: RawBooking } | null)?.data ?? {};
+  const rooms = d.bookedRooms ?? [];
+  const sum = (k: "adults" | "children") =>
     rooms.reduce((a, r) => a + (Number(r?.[k]) || 0), 0);
   const remarks = d.cancellationPolicies?.hotelRemarks;
   return {
@@ -98,7 +142,6 @@ export function toBooking(res: any) {
 }
 export type Booking = ReturnType<typeof toBooking>;
 
-// Booking ids are remembered per user in this browser (mock project: no database).
 const listKey = (email: string) => `easyset_bookings_${email.toLowerCase()}`;
 
 export function getRememberedBookings(email: string): string[] {
@@ -115,14 +158,11 @@ export function rememberBooking(email: string, bookingId: string) {
   try {
     const ids = getRememberedBookings(email).filter((x) => x !== bookingId);
     localStorage.setItem(listKey(email), JSON.stringify([bookingId, ...ids]));
-  } catch {
-    /* storage blocked: the booking just won't show in the list */
-  }
+  } catch {}
 }
 
-// Extra fields only present on a cancelled booking (names guessed, all optional)
-export function toCancelInfo(res: any) {
-  const d = res?.data ?? {};
+export function toCancelInfo(res: unknown) {
+  const d: RawCancelInfo = (res as { data?: RawCancelInfo } | null)?.data ?? {};
   const fee = num(d.cancellation_fee ?? d.cancellationFee);
   const refund = num(d.refund_amount ?? d.refundAmount);
   return { fee, refund };

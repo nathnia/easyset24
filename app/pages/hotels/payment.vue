@@ -3,10 +3,9 @@ import { useHotelsStore } from '~/stores/hotels'
 import { formatPrice, stayFromQuery } from '~/utils/liteapi'
 import { cancelText, checkoutKey, formatDate, toPrebook } from '~/utils/booking'
 import type { Prebook } from '~/utils/booking'
+import { loadSdk, styleSdkPayButton } from '~/utils/liteapiSdk'
 
 useHead({ title: 'Payment Details' })
-
-const SDK_URL = 'https://payment-wrapper.liteapi.travel/dist/liteAPIPayment.js?v=a1'
 
 const route = useRoute()
 const config = useRuntimeConfig()
@@ -18,7 +17,6 @@ const hotelId = computed(() => String(route.query.hotelId ?? ''))
 const offerId = computed(() => String(route.query.offerId ?? ''))
 const stay = computed(() => stayFromQuery(route.query))
 const hotel = computed(() => (detail.value?.id === hotelId.value ? detail.value : null))
-// Extra room info (beds, size, photo) only exists if the person came from the Rooms tab
 const offer = computed(() => store.rooms.find((o) => o.offerId === offerId.value))
 
 const prebook = ref<Prebook | null>(null)
@@ -29,7 +27,6 @@ const paying = ref(false)
 const sdkReady = ref(false)
 let payment: any = null
 
-// shared classes
 const field = 'w-full rounded-sm border border-gray-300 bg-white px-3 py-2 text-body-xs outline-none placeholder:text-gray-400 focus:border-primary-500'
 const card = 'rounded-md bg-white p-4 md:p-6'
 
@@ -55,29 +52,14 @@ const fieldCls = (key: Key) => [field, errors[key] ? 'border-error-light!' : '']
 
 const backLink = computed(() => (hotelId.value ? `/hotels/${hotelId.value}` : '/hotels'))
 
-function loadSdk() {
-    return new Promise<void>((resolve, reject) => {
-        if ((window as any).LiteAPIPayment) return resolve()
-        const s = document.createElement('script')
-        s.src = SDK_URL
-        s.async = true
-        s.onload = () => resolve()
-        s.onerror = () => reject(new Error('Payment form failed to load'))
-        document.head.appendChild(s)
-    })
-}
-
 onBeforeUnmount(() => {
     payment = null
 })
 
-// Card box stays locked until the guest details are good
 const guestValid = computed(
     () => !!form.first.trim() && !!form.last.trim() && /^\S+@\S+\.\S+$/.test(form.email.trim()),
 )
 
-// The SDK redirects away after paying, so keep what /reservation needs to book.
-// Saved on every change, so it is always up to date when the person presses Pay.
 function saveCheckout() {
     const p = prebook.value
     if (!p) return
@@ -93,26 +75,11 @@ function saveCheckout() {
                 phone: form.phone.trim(),
             },
         }))
-    } catch { /* storage blocked: the confirm page will say details were lost */ }
+    } catch { // ignore
+    }
 }
 watch(() => ({ ...form, remarks: remarks.value }), saveCheckout)
 
-// Tailwind resets button styles, so the SDK's own "Pay" button looks like plain text.
-// Find it and give it a real button look.
-function styleSdkPayButton(root: HTMLElement) {
-    const apply = () => {
-        root.querySelectorAll<HTMLElement>('button, [role="button"]').forEach((el) => {
-            if (el.textContent?.trim().toLowerCase() !== 'pay') return
-            el.style.cssText = 'display:block;width:100%;margin-top:16px;padding:12px;border-radius:4px;'
-                + 'background:var(--color-primary-500,#07689f);color:#fff;font-weight:600;font-size:16px;'
-                + 'text-align:center;cursor:pointer;border:0;'
-        })
-    }
-    apply()
-    new MutationObserver(apply).observe(root, { childList: true, subtree: true })
-}
-
-// Draws the card form ONE time. The card form has its own Pay button.
 let started = false
 async function startCardForm(p: Prebook) {
     if (started) return
@@ -122,7 +89,6 @@ async function startCardForm(p: Prebook) {
         const el = document.getElementById('liteapi-payment')
         if (!el) throw new Error('Payment form failed to load. Refresh the page.')
         el.innerHTML = ''
-        // We add the ids ourselves so the confirm page never depends on the SDK adding them
         const returnUrl = `${location.origin}/hotels/reservation?pid=${encodeURIComponent(p.prebookId)}&tid=${encodeURIComponent(p.transactionId)}`
         payment = new (window as any).LiteAPIPayment({
             publicKey: config.public.liteapiPaymentEnv,

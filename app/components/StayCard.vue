@@ -23,7 +23,7 @@ withDefaults(
     <article
         class="group cursor-pointer rounded-md border border-gray-300 bg-white p-2 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-primary-400 hover:shadow-lg">
         <div class="relative h-49.5 overflow-hidden rounded-sm bg-gray-300">
-            <img :src="image" :alt="city"
+            <img :src="image" :alt="city" loading="lazy"
                 class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
 
             <FavButton class="absolute left-2 top-2" />

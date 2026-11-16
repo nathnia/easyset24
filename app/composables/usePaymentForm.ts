@@ -13,25 +13,6 @@ export const validPhone = (v: string) =>
     ? ""
     : "Enter a valid phone number";
 
-export const validCard = (v: string) =>
-  /^\d{13,19}$/.test(v.replace(/\s/g, "")) ? "" : "Enter a valid card number";
-
-export const validCvc = (v: string) =>
-  /^\d{3,4}$/.test(v) ? "" : "3-4 digits";
-
-export const validExp = (v: string) => {
-  const m = v.match(/^(\d{2})\/(\d{2})$/);
-  if (!m) return "MM/YY";
-  const month = Number(m[1]);
-  const year = 2000 + Number(m[2]);
-  const now = new Date();
-  if (month < 1 || month > 12) return "Invalid month";
-  const expired =
-    year < now.getFullYear() ||
-    (year === now.getFullYear() && month < now.getMonth() + 1);
-  return expired ? "Card expired" : "";
-};
-
 interface Options<K extends string> {
   initial: Record<K, string>;
   rules: Partial<Record<K, (v: string) => string>>;

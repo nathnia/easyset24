@@ -1,5 +1,3 @@
-// Flight search: query helpers + mapping LiteAPI POST /flights/rates journeys to cards
-
 export const CABIN_OPTIONS = [
   { label: "Economy", value: "ECONOMY" },
   { label: "Premium Economy", value: "PREMIUM_ECONOMY" },
@@ -12,12 +10,11 @@ export const cabinLabel = (value: string) =>
 export const addDays = (n: number) =>
   new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
-// What the search form puts in the URL
 export interface FlightQuery {
   from: string;
   to: string;
-  depart: string; // YYYY-MM-DD
-  ret: string; // YYYY-MM-DD (only used for round-trips)
+  depart: string;
+  ret: string;
   trip: "one" | "two";
   adults: number;
   children: number;
@@ -53,12 +50,10 @@ export function flightQueryFromRoute(q: Record<string, unknown>): FlightQuery {
   };
 }
 
-// ---- results -> cards
-
 export interface FlightLayover {
   code: string;
   name: string;
-  duration: string; // "3h 5m" ("" when unknown)
+  duration: string;
   changeAirport: boolean;
   overnight: boolean;
 }
@@ -68,14 +63,14 @@ export interface FlightLeg {
   toCode: string;
   fromName: string;
   toName: string;
-  departure: string; // "16:10"
-  landing: string; // "05:55"
-  dayChange: number; // arrives N days later
-  duration: string; // "7h 45m"
-  minutes: number; // duration in minutes (for filters)
+  departure: string;
+  landing: string;
+  dayChange: number;
+  duration: string;
+  minutes: number;
   stops: number;
-  stopText: string; // "Non-stop" / "1 stop (3h 5m layover)"
-  via: string; // "Direct flight" / "FCO Rome Fiumicino"
+  stopText: string;
+  via: string;
   layovers: FlightLayover[];
 }
 
@@ -92,6 +87,88 @@ export interface FlightCard {
   baggage: string;
   out: FlightLeg;
   back: FlightLeg | null;
+}
+
+interface RawMinutes {
+  minutes?: number;
+}
+interface RawCarrier {
+  marketingLogo?: string;
+  marketingName?: string;
+  operatingName?: string;
+  marketingCode?: string;
+}
+interface RawSegment {
+  direction?: string;
+  originCode?: string;
+  originName?: string;
+  destinationCode?: string;
+  destinationName?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  stopCount?: number | string;
+  duration?: RawMinutes;
+  carrier?: RawCarrier;
+  flight?: { marketingNumber?: string | number };
+}
+interface RawConnection {
+  direction?: string;
+  arrivalAirportCode?: string;
+  arrivalAirportName?: string;
+  duration?: RawMinutes;
+  changeAirport?: boolean;
+  overnight?: boolean;
+}
+interface RawPricing {
+  display?: {
+    total?: number | string;
+    taxes?: number | string;
+    currency?: string;
+    perPassenger?: Record<string, { total?: number | string } | undefined>;
+  };
+}
+interface RawBag {
+  bagType?: string;
+  passengerType?: string;
+  pieces?: number;
+  weightKg?: number;
+  description?: string;
+}
+interface RawFare {
+  family?: string;
+  seatsRemaining?: number | string;
+}
+interface RawOffer {
+  offerId?: string | number;
+  pricing?: RawPricing;
+  fare?: RawFare;
+  baggage?: { hasCheckedBag?: boolean; hasCarryOnBag?: boolean };
+}
+interface RawJourney {
+  journeyKey?: string | number;
+  segments?: RawSegment[];
+  connections?: RawConnection[];
+  legDurations?: { direction?: string; duration?: RawMinutes }[];
+  cheapestOffer?: RawOffer;
+  offers?: RawOffer[];
+  pricing?: RawPricing;
+  fare?: RawFare;
+  expiration?: string;
+  baggage?: {
+    hasCheckedBag?: boolean;
+    hasCarryOnBag?: boolean;
+    included?: RawBag[];
+  };
+  terms?: {
+    refundable?: boolean;
+    changeable?: boolean;
+    summary?: { level?: string; message?: string }[];
+  };
+}
+interface RawChanges {
+  priceChanged?: boolean;
+  pricing?: { old?: RawPricing; new?: RawPricing };
+  messages?: unknown[];
 }
 
 const time = (iso?: string) => (iso ?? "").slice(11, 16);
@@ -123,28 +200,29 @@ export function formatFlightPrice(amount: number, currency = "USD") {
   }
 }
 
-function buildLeg(journey: any, dir: "OUTBOUND" | "INBOUND"): FlightLeg | null {
-  const segs: any[] = (journey.segments ?? []).filter(
-    (s: any) => (s.direction || "OUTBOUND") === dir,
+function buildLeg(
+  journey: RawJourney,
+  dir: "OUTBOUND" | "INBOUND",
+): FlightLeg | null {
+  const segs = (journey.segments ?? []).filter(
+    (s) => (s.direction || "OUTBOUND") === dir,
   );
   if (!segs.length) return null;
-  const first = segs[0];
-  const last = segs[segs.length - 1];
+  const first = segs[0]!;
+  const last = segs[segs.length - 1]!;
 
-  const conns: any[] = (journey.connections ?? []).filter(
-    (c: any) => (c.direction || "OUTBOUND") === dir,
+  const conns = (journey.connections ?? []).filter(
+    (c) => (c.direction || "OUTBOUND") === dir,
   );
   const technical = segs.reduce((n, s) => n + (Number(s.stopCount) || 0), 0);
   const stops = conns.length + technical;
 
   const minutes =
-    journey.legDurations?.find((d: any) => d.direction === dir)?.duration
-      ?.minutes ?? segs.reduce((n, s) => n + (s.duration?.minutes || 0), 0);
+    journey.legDurations?.find((d) => d.direction === dir)?.duration?.minutes ??
+    segs.reduce((n, s) => n + (s.duration?.minutes || 0), 0);
 
-  const layover =
-    conns.length === 1 && conns[0].duration?.minutes
-      ? ` (${formatMinutes(conns[0].duration.minutes)} layover)`
-      : "";
+  const onlyGap = conns.length === 1 ? conns[0]?.duration?.minutes : undefined;
+  const layover = onlyGap ? ` (${formatMinutes(onlyGap)} layover)` : "";
   const via = conns
     .map((c) =>
       [c.arrivalAirportCode, c.arrivalAirportName].filter(Boolean).join(" "),
@@ -177,9 +255,11 @@ function buildLeg(journey: any, dir: "OUTBOUND" | "INBOUND"): FlightLeg | null {
   };
 }
 
-// POST /flights/rates -> { data: [{ journeys: [...] }] }, cheapest first
-export function toFlightCards(res: any): FlightCard[] {
-  const sets: any[] = Array.isArray(res?.data) ? res.data : [];
+export function toFlightCards(res: unknown): FlightCard[] {
+  const data = (res as { data?: unknown } | null)?.data;
+  const sets = (Array.isArray(data) ? data : []) as {
+    journeys?: RawJourney[];
+  }[];
   const seen = new Set<string>();
   const cards: FlightCard[] = [];
 
@@ -195,7 +275,7 @@ export function toFlightCards(res: any): FlightCard[] {
       seen.add(key);
 
       const firstSeg = (j.segments ?? []).find(
-        (s: any) => (s.direction || "OUTBOUND") === "OUTBOUND",
+        (s) => (s.direction || "OUTBOUND") === "OUTBOUND",
       );
       const carrier = firstSeg?.carrier ?? {};
       const logo = String(carrier.marketingLogo ?? "");
@@ -228,8 +308,6 @@ export function toFlightCards(res: any): FlightCard[] {
   return cards.sort((a, b) => a.price - b.price);
 }
 
-// ---- verify (flight detail page)
-
 export interface DetailSegment {
   fromCode: string;
   fromName: string;
@@ -239,19 +317,19 @@ export interface DetailSegment {
   landing: string;
   dayChange: number;
   duration: string;
-  flightNo: string; // "DE2017"
+  flightNo: string;
   airline: string;
   airlineCode: string;
   logoUrl: string;
 }
 
 export interface DetailLeg {
-  date: string; // departure date YYYY-MM-DD
+  date: string;
   arriveDate: string;
   stops: number;
   stopText: string;
   segments: DetailSegment[];
-  layovers: FlightLayover[]; // durations are unknown here (see the search card)
+  layovers: FlightLayover[];
 }
 
 export interface FlightDetail {
@@ -267,14 +345,13 @@ export interface FlightDetail {
   changeable: boolean;
   terms: { level: string; message: string }[];
   priceChange: { oldPrice: number; newPrice: number } | null;
-  perPassenger: { adult: number | null; child: number | null }; // price of ONE passenger
+  perPassenger: { adult: number | null; child: number | null };
   messages: string[];
   out: DetailLeg;
   back: DetailLeg | null;
 }
 
-// "Tue, 1 Jul"
-export function formatDate(iso: string) {
+export function formatFlightDate(iso: string) {
   if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return "";
   return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", {
     weekday: "short",
@@ -284,7 +361,6 @@ export function formatDate(iso: string) {
   });
 }
 
-// Wait between two flights, from the airport's own clock (same airport = same zone)
 function gapText(arrive?: string, depart?: string) {
   const mins = Math.round(
     (Date.parse(depart ?? "") - Date.parse(arrive ?? "")) / 60000,
@@ -293,11 +369,11 @@ function gapText(arrive?: string, depart?: string) {
 }
 
 function detailLeg(
-  journey: any,
+  journey: RawJourney,
   dir: "OUTBOUND" | "INBOUND",
 ): DetailLeg | null {
-  const segs: any[] = (journey.segments ?? []).filter(
-    (s: any) => (s.direction || "OUTBOUND") === dir,
+  const segs = (journey.segments ?? []).filter(
+    (s) => (s.direction || "OUTBOUND") === dir,
   );
   if (!segs.length) return null;
 
@@ -328,8 +404,8 @@ function detailLeg(
   const stops = segs.length - 1 + technical;
 
   return {
-    date: String(segs[0].departureTime ?? "").slice(0, 10),
-    arriveDate: String(segs[segs.length - 1].arrivalTime ?? "").slice(0, 10),
+    date: String(segs[0]?.departureTime ?? "").slice(0, 10),
+    arriveDate: String(segs[segs.length - 1]?.arrivalTime ?? "").slice(0, 10),
     stops,
     stopText:
       stops === 0 ? "Non-stop" : `${stops} ${stops === 1 ? "stop" : "stops"}`,
@@ -344,7 +420,7 @@ function detailLeg(
   };
 }
 
-const bagText = (e: any) => {
+const bagText = (e?: RawBag) => {
   if (!e) return "Not included";
   const parts: string[] = [];
   if (e.pieces)
@@ -353,16 +429,19 @@ const bagText = (e: any) => {
   return parts.join(", ") || e.description || "Included";
 };
 
-// POST /flights/verify -> { data: [{ journey, changes }] }
-export function toFlightDetail(res: any): FlightDetail | null {
-  const d = res?.data?.[0];
+export function toFlightDetail(res: unknown): FlightDetail | null {
+  const d = (
+    res as {
+      data?: { journey?: RawJourney; changes?: RawChanges }[];
+    } | null
+  )?.data?.[0];
   const j = d?.journey;
   const price = Number(j?.pricing?.display?.total);
   if (!j || !Number.isFinite(price)) return null;
   const out = detailLeg(j, "OUTBOUND");
   if (!out) return null;
 
-  const bags: any[] = j.baggage?.included ?? [];
+  const bags = j.baggage?.included ?? [];
   const adult = (type: string) =>
     bags.find(
       (b) => b.bagType === type && (b.passengerType ?? "ADT") === "ADT",
@@ -395,7 +474,7 @@ export function toFlightDetail(res: any): FlightDetail | null {
         : bagText(adult("checked")),
     refundable: !!j.terms?.refundable,
     changeable: !!j.terms?.changeable,
-    terms: (j.terms?.summary ?? []).map((t: any) => ({
+    terms: (j.terms?.summary ?? []).map((t) => ({
       level: String(t.level ?? "info"),
       message: String(t.message ?? ""),
     })),

@@ -57,6 +57,9 @@ export const useHotelsStore = defineStore("hotels", {
     roomsLoading: false,
     roomsError: "",
     roomsKey: "",
+    // counters to ignore answers of older requests (in state, so SSR requests do not share them)
+    listRun: 0,
+    reviewsRun: 0,
   }),
 
   getters: {
@@ -78,6 +81,7 @@ export const useHotelsStore = defineStore("hotels", {
 
     async fetchPrices(ids: string[], stay: StayInfo) {
       if (!ids.length) return;
+      const list = this.listRun;
       const body = {
         hotelIds: ids,
         checkin: stay.checkin,
@@ -97,6 +101,8 @@ export const useHotelsStore = defineStore("hotels", {
         }
       }
 
+      if (list !== this.listRun) return; // a newer search replaced these hotels
+
       if (!res) {
         for (const id of ids) this.prices[id] = "error";
         return;
@@ -109,6 +115,7 @@ export const useHotelsStore = defineStore("hotels", {
     },
 
     async fetchHotels(city: string, country: string, stay: StayInfo) {
+      const run = ++this.listRun;
       this.loading = true;
       this.error = "";
       this.stay = stay;
@@ -122,9 +129,11 @@ export const useHotelsStore = defineStore("hotels", {
             ...this.facilityQuery(),
           },
         });
+        if (run !== this.listRun) return;
         this.items = res.data.map(slim);
         this.hasMore = res.data.length === LIMIT;
       } catch (e: any) {
+        if (run !== this.listRun) return;
         this.items = [];
         this.hasMore = false;
         this.error =
@@ -132,7 +141,7 @@ export const useHotelsStore = defineStore("hotels", {
           e?.statusMessage ||
           "Failed to load hotels.";
       } finally {
-        this.loading = false;
+        if (run === this.listRun) this.loading = false;
       }
     },
 
@@ -197,21 +206,25 @@ export const useHotelsStore = defineStore("hotels", {
     },
 
     async fetchReviews(id: string) {
+      const run = ++this.reviewsRun;
       this.reviews = [];
       this.rates = [];
       try {
         const res = await $fetch<LiteApiReviewsResponse>("/api/reviews", {
           query: { hotelId: id, limit: 10, getSentiment: true },
         });
+        if (run !== this.reviewsRun) return;
         this.reviews = res.data.map(toReviewCard).filter((r) => r.text);
         this.rates = toRates(res.sentimentAnalysis);
       } catch {
+        if (run !== this.reviewsRun) return;
         this.reviews = [];
         this.rates = [];
       }
     },
 
     async loadMore(city: string, country: string) {
+      const run = this.listRun;
       this.loadingMore = true;
       try {
         const res = await $fetch<LiteApiHotelsResponse>("/api/hotels", {
@@ -223,9 +236,11 @@ export const useHotelsStore = defineStore("hotels", {
             ...this.facilityQuery(),
           },
         });
+        if (run !== this.listRun) return; // search changed while loading more
         this.items = [...this.items, ...res.data.map(slim)];
         this.hasMore = res.data.length === LIMIT;
       } catch {
+        if (run !== this.listRun) return;
         this.hasMore = false;
       } finally {
         this.loadingMore = false;

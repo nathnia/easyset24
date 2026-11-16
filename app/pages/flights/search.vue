@@ -266,7 +266,7 @@ watch(filtered, () => { page.value = 1 })
                     <article v-for="a in pageCards" :key="a.key"
                         class="flex flex-col gap-4 rounded-md border border-gray-300 bg-white p-2 transition-shadow hover:shadow-lg md:flex-row">
                         <div class="relative h-72 shrink-0 overflow-hidden rounded-sm bg-gray-300 md:h-auto md:w-62.5">
-                            <img :src="flightImage(a.airline)" :alt="a.airline"
+                            <img :src="flightImage(a.airline)" :alt="a.airline" loading="lazy"
                                 class="absolute inset-0 h-full w-full object-cover"
                                 @error="onFlightImgError($event, a.airline)" />
                             <span
@@ -281,14 +281,14 @@ watch(filtered, () => { page.value = 1 })
                                 class="absolute inset-x-0 bottom-0 flex h-10 items-center justify-between bg-black/50 px-4 text-white">
                                 <span class="truncate text-h6">{{ a.airline }}</span>
                                 <span class="shrink-0 rounded-sm border border-white/80 px-1 text-button-s">{{ a.cabin
-                                }}</span>
+                                    }}</span>
                             </div>
                         </div>
 
                         <div class="grid flex-1 content-between gap-x-4 gap-y-5 py-2 pr-2 md:grid-cols-3">
                             <p class="flex items-center rounded-sm bg-gray-200 px-3 py-3 text-h6">
                                 From <span class="ml-2 text-primary-500">{{ place(a.out.fromCode, a.out.fromName)
-                                }}</span>
+                                    }}</span>
                             </p>
                             <div class="text-center">
                                 <svg viewBox="0 0 200 40" class="mx-auto h-6 w-full max-w-48" fill="none"
@@ -344,7 +344,7 @@ watch(filtered, () => { page.value = 1 })
 
                             <div class="flex items-center justify-between gap-3">
                                 <span class="text-h3 text-success-dark">{{ formatFlightPrice(a.price, a.currency)
-                                }}</span>
+                                    }}</span>
                                 <span v-if="a.seats !== null"
                                     class="rounded-sm bg-success-light px-3 py-2 text-body-xs text-success-dark">{{
                                         a.seats }} {{ a.seats === 1 ? 'seat' : 'seats' }} left</span>

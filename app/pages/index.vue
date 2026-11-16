@@ -184,7 +184,7 @@ const inspirationImage = 'https://substackcdn.com/image/fetch/$s_!N2rG!,w_1456,c
                     <div v-for="(o, i) in row.items" :key="i"
                         class="group relative h-44 cursor-pointer overflow-hidden bg-gray-300 max-md:rounded-md md:h-56 xl:h-72.5"
                         :class="o.corner">
-                        <img :src="o.img" alt=""
+                        <img :src="o.img" alt="" loading="lazy"
                             class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                         <button
                             class="absolute bottom-3 left-3 flex items-center gap-1 rounded-sm bg-black/70 px-3 py-1.5 text-caption-s text-white transition-colors group-hover:bg-primary-500">

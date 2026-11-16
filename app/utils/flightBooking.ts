@@ -1,13 +1,75 @@
-// Helpers for the flight checkout: prebook -> pay -> book
-
 import { formatMinutes } from "~/utils/flights";
 
 export const flightBookingKey = (prebookId: string) =>
   `easyset_flight_booking_${prebookId}`;
 
-// POST /flights/prebooks -> { data: [{ prebookId, transactionId, secretKey, price, currency }] }
-export function toFlightPrebook(res: any) {
-  const d = res?.data?.[0] ?? {};
+interface RawPrebook {
+  prebookId?: string;
+  transactionId?: string;
+  secretKey?: string;
+  price?: number | string;
+  currency?: string;
+}
+interface RawSegment {
+  segmentKey?: string;
+  direction?: string;
+  originCode?: string;
+  originName?: string;
+  destinationCode?: string;
+  destinationName?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  duration?: { minutes?: number };
+  flight?: { marketingNumber?: string | number };
+  carrier?: {
+    marketingLogo?: string;
+    marketingName?: string;
+    operatingName?: string;
+    marketingCode?: string;
+  };
+}
+interface RawBooking {
+  bookingId?: string | number;
+  status?: string;
+  cancelIntentAt?: unknown;
+  pricing?: { totalAmount?: number | string; currency?: string };
+  payment?: { amount?: number | string; currency?: string };
+  airlineLocators?: { airlinePnr?: string }[];
+  passengers?: { firstName?: string; lastName?: string }[];
+  order?: {
+    currency?: string;
+    price?: { total?: number | string };
+    reference?: { airlineBookings?: { airlinePnr?: string; pnr?: string }[] };
+  };
+  journey?: {
+    segments?: RawSegment[];
+    segmentFares?: { segmentKey?: string; cabin?: string }[];
+    fare?: { family?: string };
+    terms?: { refundable?: boolean };
+    pricing?: { display?: { total?: number | string } };
+  };
+}
+interface RawMoney {
+  display?: { amount?: number | string; currency?: string };
+}
+interface RawQuote {
+  penalties?: { pricing?: RawMoney }[];
+  vouchers?: { pricing?: RawMoney }[];
+  refund?: RawMoney;
+  penalty?: RawMoney;
+  isRefundable?: boolean;
+  destination?: string;
+}
+interface RawCancel {
+  status?: string;
+  cancellation_fee?: number | string;
+  refund_amount?: number | string;
+  currency?: string;
+}
+
+export function toFlightPrebook(res: unknown) {
+  const d: RawPrebook =
+    (res as { data?: RawPrebook[] } | null)?.data?.[0] ?? {};
   return {
     prebookId: String(d.prebookId ?? ""),
     transactionId: String(d.transactionId ?? ""),
@@ -18,7 +80,6 @@ export function toFlightPrebook(res: any) {
 }
 export type FlightPrebook = ReturnType<typeof toFlightPrebook>;
 
-// "2026-07-02T16:10:00" -> "16:10" / "Thursday, 2 July" (local airport time, no timezone shift)
 const clock = (iso?: string) => (iso ?? "").slice(11, 16);
 const longDate = (iso?: string) =>
   /^\d{4}-\d{2}-\d{2}/.test(iso ?? "")
@@ -36,16 +97,17 @@ export interface TicketSegment {
   code: string;
   cabin: string;
   duration: string;
-  connecting: boolean; // continues the previous flight (same direction)
+  connecting: boolean;
   from: { code: string; time: string; date: string; airport: string };
   to: { code: string; time: string; date: string; airport: string };
 }
 
-// POST /flights/bookings -> { data: [{ booking }] }
-export function toFlightBooking(res: any) {
-  const b = res?.data?.[0]?.booking ?? {};
-  const segs: any[] = b.journey?.segments ?? [];
-  const fares: any[] = b.journey?.segmentFares ?? [];
+export function toFlightBooking(res: unknown) {
+  const b: RawBooking =
+    (res as { data?: { booking?: RawBooking }[] } | null)?.data?.[0]?.booking ??
+    {};
+  const segs = b.journey?.segments ?? [];
+  const fares = b.journey?.segmentFares ?? [];
 
   const segments: TicketSegment[] = segs.map((s, i) => {
     const c = s.carrier ?? {};
@@ -75,12 +137,12 @@ export function toFlightBooking(res: any) {
     };
   });
 
-  // Wait between a flight and the next one of the same direction ("4h 45m")
   const layovers = segs.map((s, i) => {
     const next = segs[i + 1];
     if (!next || next.direction !== s.direction) return null;
     const mins = Math.round(
-      (Date.parse(next.departureTime) - Date.parse(s.arrivalTime)) / 60000,
+      (Date.parse(next.departureTime ?? "") - Date.parse(s.arrivalTime ?? "")) /
+        60000,
     );
     return {
       airport: s.destinationName ?? s.destinationCode ?? "",
@@ -122,32 +184,31 @@ export function toFlightBooking(res: any) {
     ),
     segments,
     layovers,
-    passengers: (b.passengers ?? []).map((p: any) =>
+    passengers: (b.passengers ?? []).map((p) =>
       [p.firstName, p.lastName].filter(Boolean).join(" "),
-    ) as string[],
+    ),
   };
 }
 export type FlightBooking = ReturnType<typeof toFlightBooking>;
 
-// ---- cancellation (GET quote / POST cancel)
-const amount = (v: any) =>
-  Number.isFinite(Number(v?.display?.amount)) ? Number(v.display.amount) : null;
+const amount = (v?: RawMoney) => {
+  const n = Number(v?.display?.amount);
+  return Number.isFinite(n) ? n : null;
+};
 
-export function toFlightQuote(res: any) {
-  const d = res?.data?.[0] ?? {};
+export function toFlightQuote(res: unknown) {
+  const d: RawQuote = (res as { data?: RawQuote[] } | null)?.data?.[0] ?? {};
   const itemised = (d.penalties ?? [])
-    .map((p: any) => amount(p.pricing))
-    .filter((n: any) => n !== null);
-  const vouchers: number[] = (d.vouchers ?? [])
-    .map((v: any) => amount(v.pricing))
-    .filter((n: any) => n !== null);
+    .map((p) => amount(p.pricing))
+    .filter((n): n is number => n !== null);
+  const vouchers = (d.vouchers ?? [])
+    .map((v) => amount(v.pricing))
+    .filter((n): n is number => n !== null);
   return {
     refund: amount(d.refund),
     penalty:
       amount(d.penalty) ??
-      (itemised.length
-        ? itemised.reduce((a: number, b: number) => a + b, 0)
-        : null),
+      (itemised.length ? itemised.reduce((a, b) => a + b, 0) : null),
     currency: String(
       d.refund?.display?.currency ||
         d.penalty?.display?.currency ||
@@ -161,10 +222,9 @@ export function toFlightQuote(res: any) {
 }
 export type FlightQuote = ReturnType<typeof toFlightQuote>;
 
-export function toFlightCancel(res: any) {
-  const d = res?.data ?? {};
+export function toFlightCancel(res: unknown) {
+  const d: RawCancel = (res as { data?: RawCancel } | null)?.data ?? {};
   return {
-    // 202 = airline accepted the request but has not confirmed it yet: status is still CONFIRMED
     pending: d.status === "CONFIRMED",
     fee: Number.isFinite(Number(d.cancellation_fee))
       ? Number(d.cancellation_fee)
@@ -176,7 +236,6 @@ export function toFlightCancel(res: any) {
   };
 }
 
-// ---- booking ids are remembered per user in this browser (mock project: no database)
 const listKey = (email: string) =>
   `easyset_flight_bookings_${email.toLowerCase()}`;
 
@@ -194,12 +253,9 @@ export function rememberFlight(email: string, bookingId: string) {
   try {
     const ids = getRememberedFlights(email).filter((x) => x !== bookingId);
     localStorage.setItem(listKey(email), JSON.stringify([bookingId, ...ids]));
-  } catch {
-    /* storage blocked: the booking just won't show in the list */
-  }
+  } catch {}
 }
 
-// LiteAPI status code -> text for customers
 const STATUS_LABELS: Record<string, string> = {
   CREATED: "Created",
   PENDING_CONFIRMATION: "Pending confirmation",

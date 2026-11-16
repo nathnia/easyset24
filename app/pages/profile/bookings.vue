@@ -37,7 +37,15 @@ const items = ref<Item[]>([])
 const flights = ref<FlightItem[]>([])
 const loading = ref(true)
 
-const errText = (e: any, fallback: string) => e?.data?.statusMessage || e?.statusMessage || e?.message || fallback
+interface ApiError {
+    message?: string
+    statusMessage?: string
+    data?: { statusMessage?: string; data?: { description?: string } }
+}
+const errText = (e: unknown, fallback: string) => {
+    const x = e as ApiError | null
+    return x?.data?.statusMessage || x?.statusMessage || x?.message || fallback
+}
 const isCancelled = (b: Booking) => /^cancel/i.test(b.status)
 
 async function fetchBooking(id: string) {
@@ -45,52 +53,52 @@ async function fetchBooking(id: string) {
 }
 
 onMounted(async () => {
-    const ids = getRememberedBookings(user.value?.email ?? '')
-    items.value = await Promise.all(
-        ids.map(async (id): Promise<Item> => {
-            const base = { id, confirming: false, cancelling: false, cancelError: '' }
-            try {
-                return { ...base, booking: await fetchBooking(id), error: '' }
-            } catch (e: any) {
-                return { ...base, booking: null, error: errText(e, 'Could not load this booking.') }
-            }
-        }),
-    )
-    const flightIds = getRememberedFlights(user.value?.email ?? '')
-    flights.value = await Promise.all(
-        flightIds.map(async (id): Promise<FlightItem> => {
-            const base = { id, quoting: false, confirming: false, cancelling: false, cancelError: '', quote: null, result: null }
-            try {
-                return { ...base, booking: await fetchFlight(id), error: '' }
-            } catch (e: any) {
-                return { ...base, booking: null, error: flightErr(e, 'Could not load this booking.') }
-            }
-        }),
-    )
+    const email = user.value?.email ?? ''
+    const [hotelItems, flightItems] = await Promise.all([
+        Promise.all(
+            getRememberedBookings(email).map(async (id): Promise<Item> => {
+                const base = { id, confirming: false, cancelling: false, cancelError: '' }
+                try {
+                    return { ...base, booking: await fetchBooking(id), error: '' }
+                } catch (e) {
+                    return { ...base, booking: null, error: errText(e, 'Could not load this booking.') }
+                }
+            }),
+        ),
+        Promise.all(
+            getRememberedFlights(email).map(async (id): Promise<FlightItem> => {
+                const base = { id, quoting: false, confirming: false, cancelling: false, cancelError: '', quote: null, result: null }
+                try {
+                    return { ...base, booking: await fetchFlight(id), error: '' }
+                } catch (e) {
+                    return { ...base, booking: null, error: flightErr(e, 'Could not load this booking.') }
+                }
+            }),
+        ),
+    ])
+    items.value = hotelItems
+    flights.value = flightItems
     loading.value = false
 })
 
-// ---- flights
-const flightErr = (e: any, fallback: string) => e?.data?.data?.description || errText(e, fallback)
+const flightErr = (e: unknown, fallback: string) => (e as ApiError | null)?.data?.data?.description || errText(e, fallback)
 const fetchFlight = async (id: string) => toFlightBooking(await $fetch('/api/flight-booking', { query: { id } }))
 const flightCancelled = (b: FlightBooking) => /^cancel/i.test(b.status)
 const money = (n: number, c: string) => formatFlightPrice(n, c)
 
-// Step 1: ask the airline what cancelling would cost (nothing is cancelled yet)
 async function startFlightCancel(f: FlightItem) {
     f.quoting = true
     f.cancelError = ''
     try {
         f.quote = toFlightQuote(await $fetch('/api/flight-cancel', { query: { id: f.id } }))
         f.confirming = true
-    } catch (e: any) {
+    } catch (e) {
         f.cancelError = flightErr(e, 'Could not get the cancellation quote.')
     } finally {
         f.quoting = false
     }
 }
 
-// Step 2: the customer agreed, cancel for real
 async function confirmFlightCancel(f: FlightItem) {
     f.cancelling = true
     f.cancelError = ''
@@ -98,7 +106,7 @@ async function confirmFlightCancel(f: FlightItem) {
         f.result = toFlightCancel(await $fetch('/api/flight-cancel', { method: 'POST', body: { id: f.id } }))
         f.booking = await fetchFlight(f.id)
         f.confirming = false
-    } catch (e: any) {
+    } catch (e) {
         f.cancelError = flightErr(e, 'Could not cancel this booking.')
     } finally {
         f.cancelling = false
@@ -149,7 +157,7 @@ async function cancel(item: Item) {
         item.refund = refund
         item.booking = await fetchBooking(item.id)
         item.confirming = false
-    } catch (e: any) {
+    } catch (e) {
         item.cancelError = errText(e, 'Could not cancel this booking.')
     } finally {
         item.cancelling = false
@@ -193,7 +201,7 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                         <h2 class="text-label-m">{{ item.booking.hotelName || 'Hotel booking' }}</h2>
                                         <p class="mt-1 text-caption-s text-gray-500">Booking No. {{
                                             item.booking.bookingId
-                                            }}</p>
+                                        }}</p>
                                     </div>
                                     <span class="rounded-full px-3 py-1 text-caption-s font-semibold!" :class="isCancelled(item.booking)
                                         ? 'bg-gray-300 text-gray-500'
@@ -226,7 +234,7 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                     <div>
                                         <dt class="text-caption-s text-gray-500">Total</dt>
                                         <dd>{{ item.booking.price !== undefined ? formatPrice(item.booking.price) : '-'
-                                            }}
+                                        }}
                                         </dd>
                                     </div>
                                 </dl>
@@ -239,7 +247,7 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                     <p v-if="item.refund !== undefined || item.fee !== undefined"
                                         class="mt-3 text-body-xs">
                                         <span v-if="item.refund !== undefined">Refund: <b>{{ formatPrice(item.refund)
-                                                }}</b></span>
+                                        }}</b></span>
                                         <span v-if="item.fee !== undefined" class="ml-4">Cancellation fee: <b>{{
                                             formatPrice(item.fee) }}</b></span>
                                     </p>
@@ -297,9 +305,9 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                     <div>
                                         <h2 class="text-label-m">{{ f.booking.route || 'Flight booking' }}</h2>
                                         <p class="mt-1 text-caption-s text-gray-500">Booking No. {{ f.booking.bookingId
-                                            }}
+                                        }}
                                             <template v-if="f.booking.pnr"> | Airline Reference {{ f.booking.pnr
-                                                }}</template>
+                                            }}</template>
                                         </p>
                                     </div>
                                     <span class="rounded-full px-3 py-1 text-caption-s font-semibold!"
@@ -335,7 +343,7 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                     <p v-if="f.result" class="mt-3 text-body-xs">
                                         <span>Refund: <b>{{ money(f.result.refund, f.result.currency) }}</b></span>
                                         <span class="ml-4">Cancellation fee: <b>{{ money(f.result.fee,
-                                                f.result.currency) }}</b></span>
+                                            f.result.currency) }}</b></span>
                                     </p>
                                 </template>
 
@@ -371,7 +379,7 @@ const nights = (b: Booking) => nightsBetween(b.checkin, b.checkout)
                                         </div>
                                     </div>
                                     <p v-if="f.cancelError" class="mt-2 text-body-xs text-error-light">{{ f.cancelError
-                                        }}</p>
+                                    }}</p>
                                 </div>
                             </template>
                         </li>

@@ -48,7 +48,7 @@ function toggleFav() {
 
         <div class="relative h-70 w-full shrink-0 overflow-hidden rounded-sm bg-gray-300 sm:h-auto"
             :class="compact ? 'sm:h-58 sm:min-h-0 sm:w-44' : 'sm:min-h-69 sm:w-57.5'">
-            <img :src="hotel.image" :alt="hotel.name"
+            <img :src="hotel.image" :alt="hotel.name" loading="lazy"
                 class="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
             <FavButton class="absolute left-3 top-3 z-10" :size="compact ? 'sm' : 'lg'" :active="isFav"
                 @click="toggleFav" />
